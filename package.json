@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "framer-motion": "^12.23.22",
+    "katex": "^0.16.23",
     "p5": "^2.0.5",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
