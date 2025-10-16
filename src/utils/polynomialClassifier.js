@@ -40,4 +40,33 @@ export default class PolynomialPerceptron {
     this.model.weights = Array.from({ length: this.model.weights.length }, () => Math.random() - 0.5);
     this.model.bias = Math.random() - 0.5;
   }
+
+  // Evaluation helpers that operate on raw inputs
+  misclassificationRate(Xraw, y) {
+    if (!Array.isArray(Xraw) || !Array.isArray(y) || Xraw.length !== y.length)
+      return NaN;
+    const Xf = Xraw.map((v) => this.transform(v));
+    return this.model.misclassificationRate(Xf, y);
+  }
+
+  hingeLoss(Xraw, y) {
+    if (!Array.isArray(Xraw) || !Array.isArray(y) || Xraw.length !== y.length)
+      return NaN;
+    const Xf = Xraw.map((v) => this.transform(v));
+    return this.model.hingeLoss(Xf, y);
+  }
+
+  mseRaw(Xraw, y) {
+    if (!Array.isArray(Xraw) || !Array.isArray(y) || Xraw.length !== y.length)
+      return NaN;
+    const Xf = Xraw.map((v) => this.transform(v));
+    return this.model.mseRaw(Xf, y);
+  }
+
+  // Hinge-SGD training wrapper (delegates to underlying perceptron)
+  fitHingeSGD(Xraw, y, options = {}) {
+    if (!Array.isArray(Xraw) || !Array.isArray(y) || Xraw.length !== y.length) return;
+    const Xf = Xraw.map((v) => this.transform(v));
+    return this.model.fitHingeSGD(Xf, y, options);
+  }
 }
