@@ -1,0 +1,14 @@
+// Local p5 shim to override the package-provided types during incremental migration.
+// This file is intentionally minimal and declares the module as `any` so the
+// rest of the codebase can migrate without being blocked by upstream .d.ts
+// parse issues.
+declare module 'p5' {
+  const p5: any;
+  export default p5;
+}
+
+// Also provide a named export for CommonJS/ES interop imports like `import * as p5 from 'p5'`
+declare module 'p5/lib/addons/p5.dom' {
+  const whatever: any;
+  export default whatever;
+}

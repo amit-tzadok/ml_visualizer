@@ -1,0 +1,148 @@
+import React, { useEffect, useRef } from "react";
+import p5 from "p5";
+import MLPClassifier from "../utils/mlp";
+
+type Point = { x: number; y: number; label?: string };
+
+type MlpDemoProps = {
+  dataset?: Point[];
+  onDatasetChange?: (updater: ((d: Point[]) => Point[]) | Point[]) => void;
+  resetToken?: any;
+};
+
+const MlpDemo: React.FC<MlpDemoProps> = ({ dataset: externalDataset, onDatasetChange, resetToken }) => {
+  const sketchRef = useRef<HTMLDivElement | null>(null);
+  const p5Ref = useRef<any | null>(null);
+
+  useEffect(() => {
+    const sketch = (p: any) => {
+      let points: Point[] = [];
+      let X: number[][] = [];
+      let y: number[] = [];
+      let model: any = null;
+
+      const resetModel = (hidden: number[] = [16]) => {
+        model = new MLPClassifier(2, hidden, { lr: 0.05 });
+      };
+
+      const reset = () => {
+        points = [];
+        X = [];
+        y = [];
+        for (let i = 0; i < 30; i++) {
+          const vx = p.random(-1, 1);
+          const vy = p.random(-1, 1);
+          const label = vx * 0.4 + 0.1 > vy ? "A" : "B";
+          points.push({ x: vx, y: vy, label });
+          X.push([vx, vy]);
+          y.push(label === "A" ? 1 : 0);
+        }
+        resetModel();
+      };
+
+      p.setup = () => {
+        if (sketchRef.current) sketchRef.current.querySelectorAll("canvas").forEach((c: Element) => c.remove());
+        const rect = sketchRef.current?.getBoundingClientRect();
+        p.createCanvas(Math.max(300, rect?.width || 600), Math.max(300, rect?.height || 600));
+        reset();
+        if (externalDataset && Array.isArray(externalDataset) && externalDataset.length) p.updateDataset(externalDataset);
+      };
+
+      p.draw = () => {
+        p.background(255);
+        for (const pt of points) {
+          const px = p.map(pt.x, -1, 1, 0, p.width);
+          const py = p.map(pt.y, -1, 1, p.height, 0);
+          p.fill(pt.label === "A" ? "blue" : "red");
+          p.noStroke();
+          p.circle(px, py, 10);
+        }
+      };
+
+      p.mousePressed = () => {
+        if (p.mouseX < 0 || p.mouseY < 0 || p.mouseX > p.width || p.mouseY > p.height) return;
+        const mx = p.map(p.mouseX, 0, p.width, -1, 1);
+        const my = p.map(p.mouseY, p.height, 0, -1, 1);
+        const label = p.mouseButton === p.LEFT ? "A" : "B";
+        points.push({ x: mx, y: my, label });
+        X.push([mx, my]);
+        y.push(label === "A" ? 1 : 0);
+        if (onDatasetChange) onDatasetChange((d: Point[] = []) => [...d, { x: mx, y: my, label }]);
+      };
+
+      p.updateDataset = (newDataset: Point[] | undefined) => {
+        points = [];
+        X = [];
+        y = [];
+        if (newDataset && Array.isArray(newDataset)) {
+          for (const pt of newDataset) {
+            points.push({ x: pt.x, y: pt.y, label: pt.label });
+            X.push([pt.x, pt.y]);
+            y.push(pt.label === "A" ? 1 : 0);
+          }
+        }
+        resetModel();
+      };
+
+      p.trainMLP = ({ epochs = 20 } = {}) => {
+        if (!model) resetModel();
+        if (!X.length) return;
+        model.fit(X, y, { epochs, lr: 0.05, batchSize: 8 });
+      };
+
+      p.resetDemo = () => {
+        reset();
+        if (onDatasetChange) onDatasetChange([]);
+      };
+    };
+
+    if (p5Ref.current) {
+      p5Ref.current.remove();
+      p5Ref.current = null;
+    }
+    p5Ref.current = new p5(sketch, sketchRef.current as Element);
+
+    return () => {
+      if (p5Ref.current) {
+        p5Ref.current.remove();
+        p5Ref.current = null;
+      }
+    };
+  }, [externalDataset, onDatasetChange]);
+
+  useEffect(() => {
+    if (p5Ref.current && typeof p5Ref.current.updateDataset === "function") p5Ref.current.updateDataset(externalDataset || []);
+  }, [externalDataset]);
+
+  useEffect(() => {
+    if (p5Ref.current && typeof p5Ref.current.trainMLP === "function") p5Ref.current.trainMLP();
+  }, [resetToken]);
+
+  return (
+    <div ref={sketchRef} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: 0, top: 0, right: 0 }} />
+      <div style={{ position: "relative", zIndex: 10, marginTop: 10 }}>
+        <button
+          id="mlp-reset"
+          style={{ marginRight: 8 }}
+          onClick={() => {
+            if (p5Ref.current && typeof p5Ref.current.resetDemo === "function") p5Ref.current.resetDemo();
+            if (onDatasetChange) onDatasetChange([]);
+          }}
+        >
+          Reset
+        </button>
+        <button
+          id="mlp-train"
+          onClick={() => {
+            if (p5Ref.current && typeof p5Ref.current.trainMLP === "function") p5Ref.current.trainMLP({ epochs: 20 });
+          }}
+        >
+          Train
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default MlpDemo;
