@@ -29,6 +29,11 @@ export interface P5Instance {
   draw?: () => void;
   mousePressed?: () => void;
 
+  // Offscreen graphics and helpers
+  createGraphics?: (...args: any[]) => any;
+  image?: (...args: any[]) => any;
+  frameCount?: number;
+
   // Our injected helpers
   updateDataset?: (dataset?: Array<{ x: number; y: number; label?: string }>) => void;
   trainMLP?: (opts?: { epochs?: number }) => void;

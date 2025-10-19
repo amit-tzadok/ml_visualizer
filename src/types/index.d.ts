@@ -9,8 +9,23 @@ export type Predicted = {
 
 // minimal p5 instance type shape used by demos.
 // avoid importing the full 'p5' types (they can be incompatible during incremental migration)
+export type P5Graphics = {
+  rect: (x: number, y: number, w: number, h: number) => void;
+  fill: (c: any) => void;
+  noStroke: () => void;
+  clear: () => void;
+  getContext?: (type: string) => any;
+  width?: number;
+  height?: number;
+};
+
 export type P5Instance = {
   remove?: () => void;
   resetDemo?: () => void;
+  createCanvas?: (w: number, h: number) => void;
+  createGraphics?: (w: number, h: number) => P5Graphics;
+  image?: (g: P5Graphics, x: number, y: number) => void;
+  frameCount?: number;
+  speedScale?: number;
   [key: string]: any;
 };

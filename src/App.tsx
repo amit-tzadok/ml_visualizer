@@ -13,6 +13,7 @@ const KnnAny: any = KnnDemo as any;
 // Use the typed PerceptronDemo directly
 const WelcomeAny: any = Welcome as any;
 import "./App.css";
+import { CopilotPopup } from "@copilotkit/react-ui";
 
 type Theme = "light" | "dark";
 
@@ -30,9 +31,6 @@ const App: React.FC = () => {
   });
   const [fx, setFx] = useState<boolean>(true);
   const [speedScale, setSpeedScale] = useState<number>(1);
-  const [showSpeedPrompt, setShowSpeedPrompt] = useState<boolean>(false);
-  const [pendingAction, setPendingAction] = useState<any>(null);
-  const [promptSpeed, setPromptSpeed] = useState<number>(1);
 
   const themes = {
     light: {
@@ -62,6 +60,59 @@ const App: React.FC = () => {
   } as const;
 
   const currentTheme = themes[theme];
+
+  // dynamic help box positioning to avoid overlapping header or side popups
+  const [helpPos, setHelpPos] = useState<{ top: number; right: number; zIndex: number }>({ top: 86, right: 20, zIndex: 1120 });
+
+  React.useEffect(() => {
+    const compute = () => {
+      // position below header
+      let top = 86;
+      const hdr = document.querySelector("header");
+      if (hdr) {
+        const r = (hdr as HTMLElement).getBoundingClientRect();
+        top = Math.round(r.bottom + 12);
+      }
+
+      // default right offset
+      let right = 20;
+      let zIndex = 1120;
+
+      // try to find a Copilot popup (common patterns) and avoid overlapping it
+      const popup = document.querySelector('[id*="copilot"], [class*="copilot"], [data-testid*="copilot"]');
+      if (popup && popup instanceof HTMLElement) {
+        try {
+          const pr = popup.getBoundingClientRect();
+          // if the popup is on the right side, place help box to the left of it
+          if (pr.left > window.innerWidth / 2) {
+            // compute right so help box sits just left of popup with 12px gap
+            right = Math.max(20, Math.round(window.innerWidth - pr.left + 12));
+          }
+          const popupZ = Number(window.getComputedStyle(popup).zIndex || 0) || 0;
+          if (popupZ && !Number.isNaN(popupZ)) {
+            zIndex = Math.max(1000, popupZ - 10);
+          }
+        } catch (e) {}
+      }
+
+      setHelpPos({ top, right, zIndex });
+    };
+
+    compute();
+    window.addEventListener("resize", compute);
+    const ro = new ResizeObserver(compute);
+    const popup = document.querySelector('[id*="copilot"], [class*="copilot"], [data-testid*="copilot"]');
+    if (popup) ro.observe(popup as Element);
+    const hdr = document.querySelector("header");
+    if (hdr) ro.observe(hdr as Element);
+    return () => {
+      window.removeEventListener("resize", compute);
+      try { ro.disconnect(); } catch (e) {}
+    };
+  }, [showWelcome]);
+
+  // fixed gutter on the right to prevent overlays from covering the demo
+  const GUTTER_WIDTH = 380; // px reserved on the right for popups (adjustable)
 
   return (
     <div
@@ -100,13 +151,8 @@ const App: React.FC = () => {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <div
-              style={{
-                fontSize: "2rem",
-                color: currentTheme.text,
-              }}
-            >
-              🧠
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <img src="/logo.png" alt="MLV" style={{ width: 48, height: 48, objectFit: 'contain' }} />
             </div>
             <h1
               style={{
@@ -115,6 +161,7 @@ const App: React.FC = () => {
                 fontWeight: "700",
                 color: currentTheme.text,
                 letterSpacing: "-0.5px",
+                fontFamily: "'Audiowide', system-ui, sans-serif",
               }}
             >
               ML Visualizer
@@ -129,6 +176,26 @@ const App: React.FC = () => {
               alignItems: "center",
             }}
           >
+            <button
+              onClick={() => {
+                try { localStorage.removeItem('mlv_seenWelcome'); } catch {}
+                setShowWelcome(true);
+              }}
+              style={{
+                padding: "8px 12px",
+                fontSize: "14px",
+                background: currentTheme.controlBg,
+                border: `1px solid ${currentTheme.shadow}`,
+                borderRadius: "8px",
+                cursor: "pointer",
+                color: currentTheme.text,
+                transition: "all 0.2s ease",
+                boxShadow: `0 2px 8px ${currentTheme.shadow}`,
+              }}
+              title="Show Welcome Screen"
+            >
+              Welcome
+            </button>
             <button
               onClick={() => setFx((v) => !v)}
               style={{
@@ -205,18 +272,23 @@ const App: React.FC = () => {
             zIndex: 5,
             boxSizing: "border-box",
             // reserve space so floating controls don't overlap the demo canvas
-            paddingBottom: 120,
-            paddingRight: 260,
-            paddingLeft: 80,
+            // when the welcome screen is shown we want a true centered layout,
+            // so set padding to 0 to avoid visual offset caused by the demo padding.
+            paddingBottom: showWelcome ? 0 : 120,
+            // reserve a right gutter for side popups like Copilot/help
+            paddingRight: showWelcome ? 0 : GUTTER_WIDTH,
+            paddingLeft: showWelcome ? 0 : 80,
           }}
         >
           {showWelcome ? (
-            <WelcomeAny
+                <WelcomeAny
               onChoose={(choice) => {
-                // ask for speed before launching chosen demo
-                setPendingAction({ type: "welcome", classifier: choice });
-                setPromptSpeed(speedScale);
-                setShowSpeedPrompt(true);
+                // directly launch chosen demo at current speed
+                setClassifier(choice);
+                setShowWelcome(false);
+                try {
+                  localStorage.setItem("mlv_seenWelcome", "1");
+                } catch {}
               }}
             />
           ) : compare ? (
@@ -279,6 +351,57 @@ const App: React.FC = () => {
         </div>
       </main>
 
+      {/* interactive right gutter that contains Copilot/help popups so they can
+          open fully without being cut off or overlapped by controls */}
+      {!showWelcome && (
+        <div
+          id="mlv-right-gutter"
+          style={{
+            position: "fixed",
+            top: Math.max(0, helpPos.top - 8),
+            right: 0,
+            width: GUTTER_WIDTH,
+            bottom: 0,
+            pointerEvents: "auto",
+            zIndex: 1350, // above floating controls (1200) and help box
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "flex-start",
+            padding: 12,
+            boxSizing: "border-box",
+            overflow: "auto",
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          <CopilotPopup
+            instructions={
+          `Assistant system context:
+          ML Visualizer is a client-side React app that demonstrates simple ML classifiers (Linear Perceptron, Polynomial Perceptron, MLP, KNN).
+          Key files:
+          - demos: src/components/* (PerceptronDemo, MlpDemo, KnnDemo, CompareDemo)
+          - models: src/utils/* (mlp.ts, perceptron.js, knn.js, polynomialClassifier.js)
+
+          Common actions:
+          - Algorithm dropdown switches demo (label: 'Algorithm').
+          - Add points by clicking canvas: Left = class A (red), Right = class B (blue). On touch devices select 'Touch tap adds' in the Model Controls panel.
+          - Floating panels: Speed (bottom-left), Algorithm+Compare (bottom-center), Model Controls (bottom-right), Help/Controls (top-right).
+          - Useful keys: 'B' adds blue, 'R' adds red, Space toggles play/pause, +/- adjusts speed.
+
+          Answer style:
+          - Prefer short, precise, step-by-step answers for how to run or reproduce things locally.
+          - When asking about code, mention the likely file and functions to check (e.g., 'See src/utils/mlp.ts -> MLPClassifier.fit').
+
+          Example Q/A:
+          Q: How do I retrain the MLP with a higher learning rate?
+          A: Open Model Controls (bottom-right) -> set LR to 0.5 -> click Train (top-left of canvas) or call Train button inside the demo.
+
+          If the user asks for code changes, suggest a minimal patch and test steps.
+          `
+            }
+/>
+        </div>
+      )}
+
       {/* Floating controls (algorithm + compare) */}
       {!showWelcome && (
         <div
@@ -318,12 +441,10 @@ const App: React.FC = () => {
               <span>Algorithm</span>
               <select
                 value={classifier}
-                onChange={(e) => {
+                  onChange={(e) => {
                   const choice = e.target.value;
-                  // ask for speed before switching demo
-                  setPendingAction({ type: "classifier", classifier: choice });
-                  setPromptSpeed(speedScale);
-                  setShowSpeedPrompt(true);
+                  // switch demo immediately at current speed
+                  setClassifier(choice);
                 }}
                 style={{
                   padding: "8px 12px",
@@ -343,18 +464,7 @@ const App: React.FC = () => {
                 <option value="mlp">Neural Network (MLP)</option>
                 <option value="knn">K-Nearest Neighbors</option>
               </select>
-              {showSpeedPrompt && (
-                <span
-                  style={{
-                    marginLeft: 10,
-                    fontSize: 12,
-                    color: currentTheme.accent,
-                    fontWeight: 600,
-                  }}
-                >
-                  ← choose speed (bottom-left)
-                </span>
-              )}
+              
             </label>
           </div>
 
@@ -369,14 +479,13 @@ const App: React.FC = () => {
               cursor: "pointer",
             }}
           >
-            <input
+              <input
               type="checkbox"
               checked={compare}
               onChange={(e) => {
                 const next = e.target.checked;
-                setPendingAction({ type: "compare", compare: next });
-                setPromptSpeed(speedScale);
-                setShowSpeedPrompt(true);
+                // toggle compare immediately at current speed
+                setCompare(next);
               }}
               style={{
                 width: "18px",
@@ -387,18 +496,7 @@ const App: React.FC = () => {
               id="mlv-compare-checkbox"
             />
             <span>🔄 Compare Mode</span>
-            {showSpeedPrompt && (
-              <span
-                style={{
-                  marginLeft: 8,
-                  fontSize: 12,
-                  color: currentTheme.accent,
-                  fontWeight: 600,
-                }}
-              >
-                ← choose speed
-              </span>
-            )}
+            
           </label>
         </div>
       )}
@@ -436,103 +534,15 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Speed prompt modal */}
-      {showSpeedPrompt && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(0,0,0,0.4)",
-            zIndex: 1300,
-          }}
-        >
-          <div
-            style={{
-              minWidth: 320,
-              background: currentTheme.controlBg,
-              padding: 20,
-              borderRadius: 12,
-              boxShadow: `0 16px 48px ${currentTheme.shadow}`,
-            }}
-          >
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>
-              Set training speed
-            </div>
-            <div style={{ marginBottom: 12 }}>
-              Select a global speed before continuing.
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <input
-                id="global-speed-prompt"
-                type="range"
-                min="0.25"
-                max="3"
-                step="0.05"
-                value={promptSpeed}
-                onChange={(e) => setPromptSpeed(Number(e.target.value))}
-                style={{ flex: 1 }}
-              />
-              <div style={{ width: 56, textAlign: "right" }}>
-                {promptSpeed.toFixed(2)}x
-              </div>
-            </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 8,
-                marginTop: 14,
-              }}
-            >
-              <button
-                onClick={() => {
-                  setShowSpeedPrompt(false);
-                  setPendingAction(null);
-                }}
-                style={{ padding: "8px 12px", borderRadius: 8 }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  // apply speed and then action
-                  setSpeedScale(promptSpeed);
-                  if (pendingAction) {
-                    if (pendingAction.type === "classifier") {
-                      setClassifier(pendingAction.classifier);
-                    } else if (pendingAction.type === "compare") {
-                      setCompare(Boolean(pendingAction.compare));
-                    } else if (pendingAction.type === "welcome") {
-                      if (pendingAction.classifier)
-                        setClassifier(pendingAction.classifier);
-                      setShowWelcome(false);
-                      try {
-                        localStorage.setItem("mlv_seenWelcome", "1");
-                      } catch {}
-                    }
-                  }
-                  setPendingAction(null);
-                  setShowSpeedPrompt(false);
-                }}
-                style={{ padding: "8px 12px", borderRadius: 8 }}
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Speed prompt removed: actions apply immediately at current speedScale */}
 
-      {/* Keyboard help box (changes when KNN selected) */}
+      {/* Keyboard help box (changes when KNN selected) - moved to top-right under header */}
       {!showWelcome && (
         <div
           style={{
             position: "fixed",
-            right: 20,
-            bottom: 20,
+            right: helpPos.right,
+            top: helpPos.top,
             background: currentTheme.controlBg,
             padding: 16,
             borderRadius: 12,
@@ -540,8 +550,8 @@ const App: React.FC = () => {
             backdropFilter: "blur(20px)",
             border: `1px solid ${currentTheme.shadow}`,
             fontSize: 14,
-            zIndex: 1200,
-            maxWidth: 280,
+            zIndex: helpPos.zIndex,
+            maxWidth: 320,
             transition: "all 0.3s ease",
           }}
           id="mlv-help-box"
@@ -669,6 +679,7 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Copilot Popup is now rendered inside the right gutter above */}
     </div>
   );
 };
