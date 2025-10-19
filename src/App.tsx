@@ -14,6 +14,7 @@ const KnnAny: any = KnnDemo as any;
 const WelcomeAny: any = Welcome as any;
 import "./App.css";
 import { CopilotPopup } from "@copilotkit/react-ui";
+import AgentPanel from "./components/AgentPanel";
 
 type Theme = "light" | "dark";
 
@@ -31,6 +32,7 @@ const App: React.FC = () => {
   });
   const [fx, setFx] = useState<boolean>(true);
   const [speedScale, setSpeedScale] = useState<number>(1);
+  const [agentOpen, setAgentOpen] = useState<boolean>(false);
 
   const themes = {
     light: {
@@ -176,6 +178,23 @@ const App: React.FC = () => {
               alignItems: "center",
             }}
           >
+            <button
+              onClick={() => setAgentOpen((v) => !v)}
+              style={{
+                padding: "8px 12px",
+                fontSize: "14px",
+                background: currentTheme.controlBg,
+                border: `1px solid ${currentTheme.shadow}`,
+                borderRadius: "8px",
+                cursor: "pointer",
+                color: currentTheme.text,
+                transition: "all 0.2s ease",
+                boxShadow: `0 2px 8px ${currentTheme.shadow}`,
+              }}
+              title="Open Assistant"
+            >
+              Assistant
+            </button>
             <button
               onClick={() => {
                 try { localStorage.removeItem('mlv_seenWelcome'); } catch {}
@@ -679,7 +698,10 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
-      {/* Copilot Popup is now rendered inside the right gutter above */}
+  {/* Copilot Popup is now rendered inside the right gutter above */}
+
+  {/* AgentPanel (local retrieval demo) */}
+  <AgentPanel open={agentOpen} onClose={() => setAgentOpen(false)} />
     </div>
   );
 };
