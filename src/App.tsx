@@ -23,6 +23,8 @@ const App: React.FC = () => {
   const [compare, setCompare] = useState<boolean>(false);
   const [runKey, setRunKey] = useState<number>(0);
   const [theme, setTheme] = useState<Theme>("light");
+    // gutterTop keeps the right gutter below the header so header buttons remain clickable
+    const [gutterTop, setGutterTop] = useState<number>(12);
   const [showWelcome, setShowWelcome] = useState<boolean>(() => {
     try {
       return localStorage.getItem("mlv_seenWelcome") === "1" ? false : true;
@@ -64,17 +66,13 @@ const App: React.FC = () => {
   const currentTheme = themes[theme];
 
   // dynamic help box positioning to avoid overlapping header or side popups
-  const [helpPos, setHelpPos] = useState<{ top: number; right: number; zIndex: number }>({ top: 86, right: 20, zIndex: 1120 });
+  // now positioned at the bottom-right (left of the chatbot/copilot popup)
+  const [helpPos, setHelpPos] = useState<{ bottom: number; right: number; zIndex: number }>({ bottom: 24, right: 20, zIndex: 1120 });
 
   React.useEffect(() => {
     const compute = () => {
-      // position below header
-      let top = 86;
-      const hdr = document.querySelector("header");
-      if (hdr) {
-        const r = (hdr as HTMLElement).getBoundingClientRect();
-        top = Math.round(r.bottom + 12);
-      }
+      // position above the bottom (fixed offset)
+      let bottom = 24;
 
       // default right offset
       let right = 20;
@@ -97,7 +95,19 @@ const App: React.FC = () => {
         } catch (e) {}
       }
 
-      setHelpPos({ top, right, zIndex });
+      setHelpPos({ bottom, right, zIndex });
+        // compute gutter top based on header bottom to avoid overlaying header
+        try {
+          const hdr = document.querySelector("header");
+          if (hdr && hdr instanceof HTMLElement) {
+            const r = hdr.getBoundingClientRect();
+            setGutterTop(Math.max(0, Math.round(r.bottom + 8)));
+          } else {
+            setGutterTop(showWelcome ? 0 : 12);
+          }
+        } catch (e) {
+          setGutterTop(showWelcome ? 0 : 12);
+        }
     };
 
     compute();
@@ -377,7 +387,7 @@ const App: React.FC = () => {
           id="mlv-right-gutter"
           style={{
             position: "fixed",
-            top: Math.max(0, helpPos.top - 8),
+            top: gutterTop,
             right: 0,
             width: GUTTER_WIDTH,
             bottom: 0,
@@ -555,13 +565,13 @@ const App: React.FC = () => {
 
       {/* Speed prompt removed: actions apply immediately at current speedScale */}
 
-      {/* Keyboard help box (changes when KNN selected) - moved to top-right under header */}
+      {/* Keyboard help box (changes when KNN selected) - positioned bottom-right, left of chatbot icon */}
       {!showWelcome && (
         <div
           style={{
             position: "fixed",
             right: helpPos.right,
-            top: helpPos.top,
+            bottom: helpPos.bottom,
             background: currentTheme.controlBg,
             padding: 16,
             borderRadius: 12,
