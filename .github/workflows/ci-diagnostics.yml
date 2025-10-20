@@ -1,0 +1,53 @@
+name: CI Diagnostics
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+
+jobs:
+  diagnostics:
+    name: Diagnostics (lint / typecheck / build / tests)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Run diagnostic script
+        env:
+          CI: true
+        run: |
+          set -euxo pipefail
+          mkdir -p ci-logs
+          echo "### Environment" > ci-logs/env.txt
+          node -v >> ci-logs/env.txt 2>&1 || true
+          npm -v >> ci-logs/env.txt 2>&1 || true
+          echo "" >> ci-logs/env.txt
+          echo "### Important env vars (non-secrets)" >> ci-logs/env.txt
+          env | grep -E "(GITHUB|NODE|NPM|VITE|CI)" | sort >> ci-logs/env.txt || true
+
+          echo "### npm ci (verbose)" > ci-logs/npm-ci.log
+          npm ci --prefer-offline --no-audit --progress=false 2>&1 | tee -a ci-logs/npm-ci.log || true
+
+          echo "### lint" > ci-logs/lint.log
+          npm run lint 2>&1 | tee -a ci-logs/lint.log || true
+
+          echo "### typecheck" > ci-logs/tsc.log
+          npx tsc --noEmit 2>&1 | tee -a ci-logs/tsc.log || true
+
+          echo "### build" > ci-logs/build.log
+          npm run build 2>&1 | tee -a ci-logs/build.log || true
+
+          echo "### tests" > ci-logs/test.log
+          npm test -- --runInBand --reporter verbose 2>&1 | tee -a ci-logs/test.log || true
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-diagnostics-logs
+          path: ci-logs
