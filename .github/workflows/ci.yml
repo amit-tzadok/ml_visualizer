@@ -47,7 +47,8 @@ jobs:
         run: npx vitest run --coverage --reporter dot
 
       - name: Upload coverage artifact
+        if: always() && github.event_name != 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
+          name: coverage-report-${{ github.run_id }}-${{ matrix.node-version }}
           path: coverage
