@@ -5,7 +5,10 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
+  // files / globs to ignore
   globalIgnores(['dist', 'src/components/*.jsx', 'scripts/*.js']),
+
+  // Default JS/JSX rules (browser / react)
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -25,5 +28,18 @@ export default defineConfig([
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
+  },
+
+  // Node-specific files (serverless functions, scripts)
+  {
+    files: ['api/**/*.js', 'scripts/**/*.js'],
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'script',
+      },
+    },
+    rules: {},
   },
 ])
