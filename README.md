@@ -14,3 +14,28 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## CopilotKit Demo
+
+This repo includes a small CopilotKit integration for demo and submission purposes.
+
+Quick start:
+
+1. Install dependencies:
+
+```bash
+npm ci
+```
+
+2. Start the dev server:
+
+```bash
+npm run dev
+```
+
+3. Open the app in the browser and click the "Assistant" button in the header to open the CopilotKit popup. Example questions:
+
+- "Where is the MLP implementation?"
+- "How do I increase the MLP learning rate?"
+
+See `SUBMISSION.md` and `Screencast.md` for submission checklist and screencast script.

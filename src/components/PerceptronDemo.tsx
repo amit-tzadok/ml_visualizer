@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import p5 from "p5";
 import Perceptron from "../utils/perceptron";
 import PolynomialPerceptron from "../utils/polynomialClassifier";
+import styles from "./PerceptronDemo.module.css";
 
 type Point = { x: number; y: number; label?: string };
 
@@ -385,7 +386,7 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
   }, [speedScale]);
 
   return (
-    <div ref={sketchRef} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
+    <div ref={sketchRef} className={styles.container}>
       <button
         id="perceptron-reset"
         onClick={() => {
@@ -400,7 +401,7 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
             }
           }
         }}
-        style={{ position: "absolute", left: 12, top: 12, zIndex: 200, padding: "6px 10px", borderRadius: 8 }}
+        className={`${styles.btn} ${styles.btnLeft}`}
       >
         Reset
       </button>
@@ -410,28 +411,13 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
             p5InstanceRef.current.maximizeMargin();
           }
         }}
-        style={{ position: "absolute", right: 12, top: 12, zIndex: 200, padding: "6px 10px", borderRadius: 8 }}
+        className={`${styles.btn} ${styles.btnRight}`}
       >
         Maximize margin
       </button>
       <div
         ref={equationRef}
-        style={{
-          position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          background: "rgba(255,255,255,0.85)",
-          padding: "6px 12px",
-          borderRadius: 10,
-          fontFamily: "monospace",
-          fontSize: 16,
-          zIndex: 100,
-          boxShadow: "0 4px 14px rgba(0,0,0,0.15)",
-          opacity: 0,
-          transition: "opacity 0.3s ease",
-          pointerEvents: "none",
-        }}
+        className={styles.equation}
       />
     </div>
   );
