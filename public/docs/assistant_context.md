@@ -7,9 +7,9 @@ ML Visualizer is a small client-side React + p5 app that demonstrates simple bin
 Key demos and locations
 
 - Linear Perceptron demo: `src/components/PerceptronDemo.jsx`
-- Polynomial Perceptron demo: `src/components/CompareDemo.jsx` (and polynomial classifier logic in `src/utils/polynomialClassifier.js`)
+- Polynomial Perceptron demo: `src/components/CompareDemo.jsx` (and polynomial classifier logic in `src/utils/polynomialClassifier.ts`)
 - MLP demo: `src/components/MlpDemo.tsx` and model: `src/utils/mlp.ts`
-- KNN demo: `src/components/KnnDemo.jsx` and helper `src/utils/knn.js`
+- KNN demo: `src/components/KnnDemo.jsx` and helper `src/utils/knn.ts`
 
 Common controls and UI
 

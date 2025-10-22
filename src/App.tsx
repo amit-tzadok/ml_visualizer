@@ -390,7 +390,7 @@ const App: React.FC = () => {
           ML Visualizer is a client-side React app that demonstrates simple ML classifiers (Linear Perceptron, Polynomial Perceptron, MLP, KNN).
           Key files:
           - demos: src/components/* (PerceptronDemo, MlpDemo, KnnDemo, CompareDemo)
-          - models: src/utils/* (mlp.ts, perceptron.js, knn.js, polynomialClassifier.js)
+          - models: src/utils/* (mlp.ts, perceptron.ts, knn.ts, polynomialClassifier.ts)
 
           Common actions:
           - Algorithm dropdown switches demo (label: 'Algorithm').
