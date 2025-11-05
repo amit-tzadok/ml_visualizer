@@ -17,19 +17,21 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
   const sketchRef = useRef<HTMLDivElement | null>(null);
   const p5Ref = useRef<P5Instance | null>(null);
   const [loss, setLoss] = useState<number | null>(null);
+  const finishedRef = useRef<HTMLDivElement | null>(null);
   // control panel state
   const [optimizer, setOptimizer] = useState<string>("sgd");
+  const [activation, setActivation] = useState<string>("sigmoid");
   const [lr, setLr] = useState<number>(0.3);
   const [batchSize, setBatchSize] = useState<number>(8);
   const [epochs, setEpochs] = useState<number>(20);
   const [hiddenUnits, setHiddenUnits] = useState<number>(16);
-  const [gridStepState, setGridStepState] = useState<number>(8);
+  const [gridStepState, setGridStepState] = useState<number>(4);
   // touch support: which class a tap should add on touch devices
   const [touchClass, setTouchClass] = useState<"A" | "B">("A");
   // draggable panel state
   const panelRef = useRef<HTMLDivElement | null>(null);
   // panel is fixed (non-draggable) and placed above the keyboard help box by default
-  const [panelPos, setPanelPos] = useState<{ x: number; y: number } | null>(null);
+  const [_panelPos, _setPanelPos] = useState<{ x: number; y: number } | null>(null);
   const [panelBottomOffset, setPanelBottomOffset] = useState<number>(140);
   // compute color scheme for controls (match system preference)
   const prefersDark = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -47,13 +49,20 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
       let y: number[] = [];
       let model: MLPClassifier | null = null;
   let gridG: any = null;
-  const defaultGridStep = gridStepState;
-      let gridStep = defaultGridStep;
-      let gridFreq = 6;
+  // Only train during an explicit training run
+  let isTraining: boolean = false;
+  let trainingEpochsRemaining = 0;
+  let trainingLR = 0.3;
+  let samplesInCurrentEpoch = 0;
+  // Adaptive grid step with optional user override via control panel
+    let overrideStep: number | null = null;
+    let adaptiveStep = gridStepState;
+    let gridStep = adaptiveStep;
+    let gridFreq = 18; // update less often for performance
       let gridDirty = true;
 
       const resetModel = (hidden: number[] = [16]) => {
-        model = new MLPClassifier(2, hidden, { lr: lr, optimizer: optimizer });
+        model = new MLPClassifier(2, hidden, { lr: lr, optimizer: optimizer, activation: activation as any });
       };
 
       const resetDemo = () => {
@@ -72,11 +81,21 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
         gridDirty = true;
       };
 
+      const computeAdaptiveStep = () => {
+        const minDim = Math.max(1, Math.min(p.width || 600, p.height || 600));
+        // Aim for ~150-200 cells on the short edge for smoother boundaries
+        const base = Math.max(3, Math.floor(minDim / 150));
+        adaptiveStep = base;
+      };
+
       p.setup = () => {
         if (sketchRef.current) sketchRef.current.querySelectorAll("canvas").forEach((c) => c.remove());
         const rect = sketchRef.current?.getBoundingClientRect();
         p.createCanvas(Math.max(300, rect?.width || 600), Math.max(300, rect?.height || 600));
+        try { (p as any).pixelDensity?.(1); } catch {}
         gridG = p.createGraphics(p.width, p.height);
+        computeAdaptiveStep();
+        gridStep = overrideStep ?? adaptiveStep;
         resetDemo();
         if (externalDataset && Array.isArray(externalDataset) && externalDataset.length) p.updateDataset(externalDataset);
 
@@ -101,7 +120,8 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
                   } else {
                     label = ev.button === 2 ? "B" : "A";
                   }
-                } catch (e) {
+                } catch {
+                  // Ignore touch detection errors
                   label = ev.button === 2 ? "B" : "A";
                 }
                 points.push({ x: mx, y: my, label });
@@ -115,50 +135,128 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
               canvas.addEventListener("contextmenu", ctxHandler);
               (canvas as any)._mlpPointerHandler = pointerHandler;
               (canvas as any)._mlpContextHandler = ctxHandler;
+              // No automatic retrain on pointer up (reverted)
             }
           }
-        } catch (e) {}
+        } catch {
+          // Ignore canvas setup errors
+        }
         // expose control values on the p5 instance so React controls can update the running sketch
         try {
           (p as any)._mlpControls = {
             get optimizer() { return optimizer; },
+            get activation() { return activation; },
             get lr() { return lr; },
             get batchSize() { return batchSize; },
             get epochs() { return epochs; },
             get hiddenUnits() { return hiddenUnits; },
             get touchClass() { return touchClass; },
-            setGridStep: (v: number) => { gridStep = v; gridDirty = true; },
+            setGridStep: (v: number) => { overrideStep = Math.max(2, v); gridStep = overrideStep; gridDirty = true; },
           };
-        } catch (e) {}
+        } catch {
+          // Ignore control setup errors
+        }
+      };
+
+      (p as any).windowResized = () => {
+        const rect = sketchRef.current?.getBoundingClientRect();
+        (p as any).resizeCanvas(Math.max(300, rect?.width || 600), Math.max(300, rect?.height || 600));
+        gridG = p.createGraphics(p.width, p.height);
+        computeAdaptiveStep();
+        gridStep = overrideStep ?? adaptiveStep;
+        gridDirty = true;
       };
 
       p.draw = () => {
-        // take a few random sample gradient steps per frame so UI stays responsive
-        if (model && X.length) {
-          const steps = Math.max(1, Math.floor(1 * (p.speedScale || 1)));
+        // Only perform per-frame updates if inside an active training run
+        if (isTraining && model && X.length && trainingEpochsRemaining > 0) {
+          const steps = Math.max(3, Math.min(10, Math.floor(5 * (p.speedScale || 1))));
           for (let s = 0; s < steps; s++) {
             const i = Math.floor(Math.random() * X.length);
-            model.trainSample(X[i], y[i], 0.3);
+            model.trainSample(X[i], y[i], trainingLR);
+            samplesInCurrentEpoch++;
+            
+            // Complete epoch after training on all samples
+            if (samplesInCurrentEpoch >= X.length) {
+              samplesInCurrentEpoch = 0;
+              trainingEpochsRemaining--;
+              
+              // Calculate and store loss
+              try {
+                const L = model.loss(X, y);
+                (p as any)._lastLoss = L;
+              } catch {}
+              
+              gridDirty = true;
+              
+              // Check if training is complete
+              if (trainingEpochsRemaining <= 0) {
+                isTraining = false;
+                // Calculate accuracy
+                let accuracy = 0;
+                try {
+                  if (model && typeof model.accuracy === 'function') {
+                    accuracy = model.accuracy(X, y);
+                  }
+                } catch {}
+                // Notify completion
+                try {
+                  window.dispatchEvent(
+                    new CustomEvent('mlv:demo-finished', {
+                      detail: { classifier: 'Neural Network (MLP)', reason: 'train-complete', accuracy },
+                    })
+                  );
+                } catch {}
+                // Show finished overlay
+                try {
+                  if (finishedRef.current) {
+                    const L = (p as any)._lastLoss;
+                    const msg = typeof L === 'number' ? `Training finished — Loss: ${L.toFixed(4)}` : 'Training finished';
+                    finishedRef.current.innerText = msg;
+                    finishedRef.current.style.display = 'block';
+                  }
+                } catch {}
+              }
+            }
           }
         }
 
-        const darkMode = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-        p.background(darkMode ? 30 : 255);
+  const isDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  p.background(isDark ? 30 : 255);
 
-        if (!gridG) gridG = p.createGraphics(p.width, p.height);
+        // Publish status for AgentPanel (MLP has no simple closed-form equation)
+        try {
+          (window as any).mlvStatus = {
+            classifier: "mlp",
+            equation: null,
+            weights: undefined,
+            bias: undefined,
+            updatedAt: Date.now(),
+          };
+        } catch {}
+
+  if (!gridG) gridG = p.createGraphics(p.width, p.height);
+  // ensure current step reflects adaptive or override
+  gridStep = overrideStep ?? adaptiveStep;
         if (p.frameCount % gridFreq === 0 || gridDirty) {
           gridDirty = false;
           gridG.clear();
+
+          // Pre-calculate colors to avoid repeated conditionals
+          const redRGBA = isDark ? "rgba(229,62,62,0.25)" : "rgba(229,62,62,0.12)";
+          const blueRGBA = isDark ? "rgba(66,153,225,0.25)" : "rgba(66,153,225,0.12)";
+
+          gridG.noStroke();
           for (let gx = 0; gx < p.width; gx += gridStep) {
             for (let gy = 0; gy < p.height; gy += gridStep) {
               const nx = p.map(gx + 0.5 * gridStep, 0, p.width, -1, 1);
               const ny = p.map(gy + 0.5 * gridStep, p.height, 0, -1, 1);
               const pred = model ? (model.forward([nx, ny]) >= 0.5 ? 1 : 0) : 0;
-              const redRGBA = darkMode ? "rgba(229,62,62,0.25)" : "rgba(229,62,62,0.12)";
-              const blueRGBA = darkMode ? "rgba(66,153,225,0.25)" : "rgba(66,153,225,0.12)";
-              gridG.noStroke();
-              gridG.fill(pred === 1 ? (redRGBA as any) : (blueRGBA as any));
-              gridG.rect(gx, gy, gridStep, gridStep);
+              gridG.fill(pred === 1 ? redRGBA : blueRGBA);
+              // Ensure full coverage by extending to canvas edge if needed
+              const rectWidth = Math.min(gridStep, p.width - gx);
+              const rectHeight = Math.min(gridStep, p.height - gy);
+              gridG.rect(gx, gy, rectWidth, rectHeight);
             }
           }
         }
@@ -187,7 +285,8 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
           } else {
             label = p.mouseButton === p.LEFT ? "A" : "B";
           }
-        } catch (e) {
+        } catch {
+          // Ignore touch detection errors
           label = p.mouseButton === p.LEFT ? "A" : "B";
         }
         points.push({ x: mx, y: my, label });
@@ -195,6 +294,7 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
         y.push(label === "A" ? 1 : 0);
         gridDirty = true;
         if (onDatasetChange) onDatasetChange((d: Point[] = []) => [...d, { x: mx, y: my, label }]);
+  // No automatic retrain on add (reverted)
       };
 
       p.updateDataset = (newDataset: Point[] | undefined) => {
@@ -212,29 +312,29 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
         gridDirty = true;
       };
 
-      p.trainMLP = (opts: { epochs?: number; lr?: number } = {}) => {
+  p.trainMLP = (opts: { epochs?: number; lr?: number } = {}) => {
+        // hide finished overlay at the start of a new training session
+        try { if (finishedRef.current) finishedRef.current.style.display = 'none'; } catch {}
         if (!model) resetModel();
         if (!model || !X.length) return;
-        const epochs = opts.epochs ?? Math.max(5, Math.floor(20 / Math.max(1, speedScale)));
-        const lr = opts.lr ?? 0.3;
-        model.fit(X, y, {
-          epochs,
-          lr,
-          batchSize: 8,
-          shuffle: true,
-          onEpoch: (epoch: number, L: number) => {
-            // store last loss on p so React can read it
-            try {
-              (p as any)._lastLoss = L;
-            } catch (e) {}
-          },
-        });
+        // Set up training parameters for real-time animation
+        trainingEpochsRemaining = opts.epochs ?? Math.max(10, Math.floor(30 / Math.max(1, speedScale)));
+        trainingLR = opts.lr ?? 0.3;
+        samplesInCurrentEpoch = 0;
+        isTraining = true;
         gridDirty = true;
       };
 
       p.resetDemo = () => {
+        // Clear background grid and loss immediately
+        try { if (gridG && typeof gridG.clear === 'function') gridG.clear(); } catch {}
+        try { (p as any)._lastLoss = undefined; } catch {}
+        isTraining = false;
+        trainingEpochsRemaining = 0;
+        gridDirty = true;
         resetDemo();
         if (onDatasetChange) onDatasetChange([]);
+        try { if (finishedRef.current) finishedRef.current.style.display = 'none'; } catch {}
       };
     };
 
@@ -295,78 +395,382 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
     if (p5Ref.current && typeof p5Ref.current.trainMLP === "function") {
       setTimeout(() => p5Ref.current.trainMLP({ epochs: Math.max(8, Math.floor(20 / Math.max(1, speedScale))) }), 50);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetToken, speedScale]);
 
   return (
-  <div ref={sketchRef} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
-      <div style={{ position: "absolute", left: 12, top: 12, zIndex: 20 }}>
+  <div ref={sketchRef} style={{ position: "relative", width: "calc(100% - 280px)", height: "100%", overflow: "hidden", marginLeft: "-140px" }}>
+      <div style={{ 
+        position: "absolute", 
+        left: 12, 
+        top: 12, 
+        zIndex: 20,
+        display: 'flex',
+        gap: 8
+      }}>
         <button
-          onClick={() => p5Ref.current && typeof p5Ref.current.resetDemo === "function" && p5Ref.current.resetDemo()}
-          style={{ marginRight: 8 }}
+          onClick={() => {
+            setLoss(null);
+            if (p5Ref.current && typeof p5Ref.current.resetDemo === "function") {
+              p5Ref.current.resetDemo();
+            }
+          }}
+          style={{
+            padding: '8px 16px',
+            fontSize: 12,
+            fontWeight: 600,
+            background: prefersDark ? 'rgba(45,55,72,0.95)' : 'rgba(255,255,255,0.95)',
+            color: panelText,
+            border: panelBorder,
+            borderRadius: 8,
+            cursor: 'pointer',
+            backdropFilter: 'blur(10px)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+          }}
         >
-          Reset
+          🔄 Reset
         </button>
         <button
           onClick={() => p5Ref.current && typeof p5Ref.current.trainMLP === "function" && p5Ref.current.trainMLP({ epochs: 20 })}
+          style={{
+            padding: '8px 16px',
+            fontSize: 12,
+            fontWeight: 600,
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 8,
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(102, 126, 234, 0.4)',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.5)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.4)';
+          }}
         >
-          Train
+          ▶️ Train
         </button>
       </div>
       {showInstructions && (
-        <div style={{ position: "absolute", right: 12, top: 12, zIndex: 20, maxWidth: 280 }}>
-          <div style={{ padding: 8, background: "rgba(255,255,255,0.9)", borderRadius: 8 }}>
-            <strong>MLP demo</strong>
-            <div style={{ fontSize: 12 }}>Click to add points (left=class A, right=class B).</div>
+        <div style={{ 
+          position: "absolute", 
+          left: 12, 
+          top: 60, 
+          zIndex: 20, 
+          maxWidth: 280,
+          background: prefersDark ? 'rgba(45,55,72,0.95)' : 'rgba(255,255,255,0.95)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: 10,
+          padding: '10px 12px',
+          border: panelBorder,
+          boxShadow: controlShadow
+        }}>
+          <div style={{ fontSize: 12, color: panelText, lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 11, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.5px' }}>🧠 Neural Network</div>
+            <div style={{ fontSize: 11, opacity: 0.9 }}>
+              <span style={{ fontWeight: 600 }}>Left click:</span> Add Red (A)<br/>
+              <span style={{ fontWeight: 600 }}>Right click:</span> Add Blue (B)
+            </div>
           </div>
         </div>
       )}
       {/* control panel */}
       <div
         ref={panelRef}
-        style={{ position: "fixed", right: 20, bottom: panelBottomOffset, zIndex: 1150, touchAction: 'none', cursor: 'default' }}
+        style={{ 
+          position: "fixed", 
+          right: 16, 
+          top: 86, 
+          zIndex: 1150, 
+          touchAction: 'none', 
+          cursor: 'default',
+          maxHeight: 'calc(100vh - 180px)',
+          overflowY: 'auto'
+        }}
       >
-        <div style={{ padding: 8, background: panelBg, borderRadius: 8, width: 220, boxSizing: 'border-box', color: panelText, border: panelBorder, boxShadow: controlShadow }}>
-          <div style={{ marginBottom: 6 }}><strong>Model Controls</strong></div>
-          <div style={{ fontSize: 12, marginBottom: 6 }}>
-            <label style={{ color: panelText }}>Optimizer: </label>
-            <select value={optimizer} onChange={(e) => { setOptimizer(e.target.value); if (p5Ref.current) (p5Ref.current as any)._mlpControls.optimizer = e.target.value; }} style={{ marginLeft: 6, background: inputBg, color: inputColor, borderRadius: 6, border: panelBorder }}>
-              <option value="sgd">SGD</option>
-              <option value="momentum">Momentum</option>
-              <option value="adam">Adam</option>
-            </select>
+        <div style={{ 
+          padding: '12px', 
+          background: panelBg, 
+          borderRadius: '12px', 
+          width: 240, 
+          boxSizing: 'border-box', 
+          color: panelText, 
+          border: panelBorder, 
+          boxShadow: controlShadow 
+        }}>
+          <div style={{ 
+            marginBottom: 10, 
+            paddingBottom: 8, 
+            borderBottom: `1px solid ${prefersDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+            fontSize: 13,
+            fontWeight: 600,
+            letterSpacing: '0.3px'
+          }}>
+            ⚙️ Model Controls
           </div>
-          <div style={{ fontSize: 12, marginBottom: 6 }}>
-            <label style={{ color: panelText }}>LR: </label>
-            <input type="number" step="0.01" value={lr} onChange={(e) => { const v = Number(e.target.value); setLr(v); if (p5Ref.current) (p5Ref.current as any)._mlpControls.lr = v; }} style={{ width: 70, marginLeft: 6, background: inputBg, color: inputColor, borderRadius: 6, border: panelBorder }} />
+          
+          {/* Architecture Section */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Architecture</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              <div>
+                <label style={{ fontSize: 11, color: panelText, opacity: 0.8, display: 'block', marginBottom: 2 }}>Activation</label>
+                <select 
+                  value={activation} 
+                  onChange={(e) => { 
+                    setActivation(e.target.value); 
+                    if (p5Ref.current) {
+                      (p5Ref.current as any)._mlpControls.activation = e.target.value;
+                      if (typeof (p5Ref.current as any).resetDemo === 'function') {
+                        (p5Ref.current as any).resetDemo();
+                      }
+                    }
+                  }} 
+                  style={{ 
+                    width: '100%',
+                    padding: '4px 6px',
+                    fontSize: 11,
+                    background: inputBg, 
+                    color: inputColor, 
+                    borderRadius: 6, 
+                    border: panelBorder 
+                  }}
+                >
+                  <option value="sigmoid">Sigmoid</option>
+                  <option value="tanh">Tanh</option>
+                  <option value="relu">ReLU</option>
+                  <option value="leaky_relu">Leaky ReLU</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: panelText, opacity: 0.8, display: 'block', marginBottom: 2 }}>Hidden Units</label>
+                <input 
+                  type="number" 
+                  value={hiddenUnits} 
+                  onChange={(e) => { 
+                    const v = Number(e.target.value); 
+                    setHiddenUnits(v); 
+                    if (p5Ref.current) (p5Ref.current as any)._mlpControls.hiddenUnits = v; 
+                  }} 
+                  style={{ 
+                    width: '100%', 
+                    padding: '4px 6px',
+                    fontSize: 11,
+                    background: inputBg, 
+                    color: inputColor, 
+                    borderRadius: 6, 
+                    border: panelBorder,
+                    boxSizing: 'border-box'
+                  }} 
+                />
+              </div>
+            </div>
           </div>
-          <div style={{ fontSize: 12, marginBottom: 6 }}>
-            <label style={{ color: panelText }}>Batch: </label>
-            <input type="number" value={batchSize} onChange={(e) => { const v = Number(e.target.value); setBatchSize(v); if (p5Ref.current) (p5Ref.current as any)._mlpControls.batchSize = v; }} style={{ width: 70, marginLeft: 6, background: inputBg, color: inputColor, borderRadius: 6, border: panelBorder }} />
+
+          {/* Training Section */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Training</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+              <div>
+                <label style={{ fontSize: 11, color: panelText, opacity: 0.8, display: 'block', marginBottom: 2 }}>Optimizer</label>
+                <select 
+                  value={optimizer} 
+                  onChange={(e) => { 
+                    setOptimizer(e.target.value); 
+                    if (p5Ref.current) (p5Ref.current as any)._mlpControls.optimizer = e.target.value; 
+                  }} 
+                  style={{ 
+                    width: '100%',
+                    padding: '4px 6px',
+                    fontSize: 11,
+                    background: inputBg, 
+                    color: inputColor, 
+                    borderRadius: 6, 
+                    border: panelBorder 
+                  }}
+                >
+                  <option value="sgd">SGD</option>
+                  <option value="momentum">Momentum</option>
+                  <option value="adam">Adam</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: panelText, opacity: 0.8, display: 'block', marginBottom: 2 }}>Learning Rate</label>
+                <input 
+                  type="number" 
+                  step="0.01" 
+                  value={lr} 
+                  onChange={(e) => { 
+                    const v = Number(e.target.value); 
+                    setLr(v); 
+                    if (p5Ref.current) (p5Ref.current as any)._mlpControls.lr = v; 
+                  }} 
+                  style={{ 
+                    width: '100%', 
+                    padding: '4px 6px',
+                    fontSize: 11,
+                    background: inputBg, 
+                    color: inputColor, 
+                    borderRadius: 6, 
+                    border: panelBorder,
+                    boxSizing: 'border-box'
+                  }} 
+                />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              <div>
+                <label style={{ fontSize: 11, color: panelText, opacity: 0.8, display: 'block', marginBottom: 2 }}>Batch Size</label>
+                <input 
+                  type="number" 
+                  value={batchSize} 
+                  onChange={(e) => { 
+                    const v = Number(e.target.value); 
+                    setBatchSize(v); 
+                    if (p5Ref.current) (p5Ref.current as any)._mlpControls.batchSize = v; 
+                  }} 
+                  style={{ 
+                    width: '100%', 
+                    padding: '4px 6px',
+                    fontSize: 11,
+                    background: inputBg, 
+                    color: inputColor, 
+                    borderRadius: 6, 
+                    border: panelBorder,
+                    boxSizing: 'border-box'
+                  }} 
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: panelText, opacity: 0.8, display: 'block', marginBottom: 2 }}>Epochs</label>
+                <input 
+                  type="number" 
+                  value={epochs} 
+                  onChange={(e) => { 
+                    const v = Number(e.target.value); 
+                    setEpochs(v); 
+                    if (p5Ref.current) (p5Ref.current as any)._mlpControls.epochs = v; 
+                  }} 
+                  style={{ 
+                    width: '100%', 
+                    padding: '4px 6px',
+                    fontSize: 11,
+                    background: inputBg, 
+                    color: inputColor, 
+                    borderRadius: 6, 
+                    border: panelBorder,
+                    boxSizing: 'border-box'
+                  }} 
+                />
+              </div>
+            </div>
           </div>
-          <div style={{ fontSize: 12, marginBottom: 6 }}>
-            <label style={{ color: panelText }}>Epochs: </label>
-            <input type="number" value={epochs} onChange={(e) => { const v = Number(e.target.value); setEpochs(v); if (p5Ref.current) (p5Ref.current as any)._mlpControls.epochs = v; }} style={{ width: 70, marginLeft: 6, background: inputBg, color: inputColor, borderRadius: 6, border: panelBorder }} />
-          </div>
-          <div style={{ fontSize: 12, marginBottom: 6 }}>
-            <label style={{ color: panelText }}>Hidden: </label>
-            <input type="number" value={hiddenUnits} onChange={(e) => { const v = Number(e.target.value); setHiddenUnits(v); if (p5Ref.current) (p5Ref.current as any)._mlpControls.hiddenUnits = v; }} style={{ width: 70, marginLeft: 6, background: inputBg, color: inputColor, borderRadius: 6, border: panelBorder }} />
-          </div>
-          <div style={{ fontSize: 12, marginBottom: 6 }}>
-            <label style={{ color: panelText }}>Grid: </label>
-            <input type="number" value={gridStepState} onChange={(e) => { const v = Number(e.target.value); setGridStepState(v); if (p5Ref.current) (p5Ref.current as any)._mlpControls.setGridStep?.(v); }} style={{ width: 70, marginLeft: 6, background: inputBg, color: inputColor, borderRadius: 6, border: panelBorder }} />
-          </div>
-          <div style={{ fontSize: 12, marginBottom: 6 }}>
-            <label style={{ color: panelText }}>Touch tap adds: </label>
-            <select value={touchClass} onChange={(e) => { const v = e.target.value as "A" | "B"; setTouchClass(v); if (p5Ref.current) (p5Ref.current as any)._mlpControls.touchClass = v; }} style={{ marginLeft: 6, background: inputBg, color: inputColor, borderRadius: 6, border: panelBorder }}>
-              <option value="A">Red (A)</option>
-              <option value="B">Blue (B)</option>
-            </select>
+
+          {/* Visualization Section */}
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Visualization</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              <div>
+                <label style={{ fontSize: 11, color: panelText, opacity: 0.8, display: 'block', marginBottom: 2 }}>Grid Size</label>
+                <input 
+                  type="number" 
+                  value={gridStepState} 
+                  onChange={(e) => { 
+                    const v = Number(e.target.value); 
+                    setGridStepState(v); 
+                    if (p5Ref.current) (p5Ref.current as any)._mlpControls.setGridStep?.(v); 
+                  }} 
+                  style={{ 
+                    width: '100%', 
+                    padding: '4px 6px',
+                    fontSize: 11,
+                    background: inputBg, 
+                    color: inputColor, 
+                    borderRadius: 6, 
+                    border: panelBorder,
+                    boxSizing: 'border-box'
+                  }} 
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: panelText, opacity: 0.8, display: 'block', marginBottom: 2 }}>Touch Adds</label>
+                <select 
+                  value={touchClass} 
+                  onChange={(e) => { 
+                    const v = e.target.value as "A" | "B"; 
+                    setTouchClass(v); 
+                    if (p5Ref.current) (p5Ref.current as any)._mlpControls.touchClass = v; 
+                  }} 
+                  style={{ 
+                    width: '100%',
+                    padding: '4px 6px',
+                    fontSize: 11,
+                    background: inputBg, 
+                    color: inputColor, 
+                    borderRadius: 6, 
+                    border: panelBorder 
+                  }}
+                >
+                  <option value="A">🔴 Red</option>
+                  <option value="B">🔵 Blue</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
       </div>
       {/* live loss overlay */}
-      <div style={{ position: "absolute", left: 12, bottom: 12, zIndex: 30, padding: 8, background: "rgba(0,0,0,0.6)", color: "#fff", borderRadius: 6, fontSize: 12 }}>
-        Loss: {loss == null ? '—' : loss.toFixed(4)}
+      <div style={{ 
+        position: "absolute", 
+        left: 12, 
+        bottom: 12, 
+        zIndex: 30, 
+        padding: '8px 12px', 
+        background: prefersDark ? "rgba(45,55,72,0.95)" : "rgba(255,255,255,0.95)", 
+        color: panelText, 
+        borderRadius: 8, 
+        fontSize: 11,
+        fontWeight: 500,
+        border: panelBorder,
+        backdropFilter: 'blur(10px)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+      }}>
+        <span style={{ opacity: 0.7 }}>Loss:</span> <span style={{ fontWeight: 600, fontFamily: 'monospace' }}>{loss == null ? '—' : loss.toFixed(4)}</span>
+      </div>
+      {/* finished overlay */}
+      <div
+        ref={finishedRef}
+        style={{
+          position: 'absolute',
+          top: 10,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(0,0,0,0.6)',
+          color: '#fff',
+          padding: '8px 12px',
+          borderRadius: 8,
+          fontSize: 12,
+          letterSpacing: 0.2,
+          display: 'none',
+          zIndex: 35,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.25)'
+        }}
+      >
+        Training finished
       </div>
     </div>
   );

@@ -6,14 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
+    "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\" api",
     "test": "vitest",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@copilotkit/react-core": "^1.10.6",
-    "@copilotkit/react-ui": "^1.10.6",
-    "framer-motion": "^12.23.22",
     "katex": "^0.16.23",
     "p5": "^2.0.5",
     "react": "^19.1.1",
@@ -24,15 +21,17 @@
     "@types/node": "^24.8.1",
     "@types/react": "^19.1.16",
     "@types/react-dom": "^19.1.9",
+    "@typescript-eslint/eslint-plugin": "^8.46.2",
+    "@typescript-eslint/parser": "^8.46.2",
     "@vitejs/plugin-react": "^5.0.4",
+    "@vitest/coverage-v8": "^1.6.1",
     "eslint": "^9.36.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.22",
     "globals": "^16.4.0",
     "puppeteer": "^24.25.0",
+    "typescript": "5.9.3",
     "vite": "^5.1.0",
-    "vitest": "^1.6.1",
-    "@vitest/coverage-v8": "^1.6.1",
-    "typescript": "5.9.3"
+    "vitest": "^1.6.1"
   }
 }

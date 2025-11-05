@@ -1,11 +1,14 @@
 // Lightweight vanilla MLP classifier (binary)
 // Small, dependency-free implementation intended for interactive demos.
 
+export type ActivationFunction = 'sigmoid' | 'tanh' | 'relu' | 'leaky_relu';
+
 export class MLPClassifier {
   inputSize: number;
   hidden: number[];
   lr: number;
   optimizer: string;
+  activation: ActivationFunction;
   momentumCoef: number;
   beta1: number;
   beta2: number;
@@ -21,11 +24,12 @@ export class MLPClassifier {
   mB: number[][] | null;
   vB: number[][] | null;
 
-  constructor(inputSize = 2, hidden: number[] | number = [16], options: { lr?: number; optimizer?: string; momentum?: number; beta1?: number; beta2?: number; eps?: number } = {}) {
+  constructor(inputSize = 2, hidden: number[] | number = [16], options: { lr?: number; optimizer?: string; activation?: ActivationFunction; momentum?: number; beta1?: number; beta2?: number; eps?: number } = {}) {
     this.inputSize = inputSize;
     this.hidden = Array.isArray(hidden) ? hidden : [hidden];
   this.lr = options.lr || 0.3;
     this.optimizer = options.optimizer || "sgd";
+    this.activation = options.activation || "sigmoid";
     this.momentumCoef = options.momentum ?? 0.9;
     this.beta1 = options.beta1 ?? 0.9;
     this.beta2 = options.beta2 ?? 0.999;
@@ -95,6 +99,33 @@ export class MLPClassifier {
 
   static sigmoid(x: number) { return 1 / (1 + Math.exp(-x)); }
   static sigmoidDeriv(y: number) { return y * (1 - y); }
+  
+  static tanh(x: number) { return Math.tanh(x); }
+  static tanhDeriv(y: number) { return 1 - y * y; }
+  
+  static relu(x: number) { return Math.max(0, x); }
+  static reluDeriv(x: number) { return x > 0 ? 1 : 0; }
+  
+  static leakyRelu(x: number) { return x > 0 ? x : 0.01 * x; }
+  static leakyReluDeriv(x: number) { return x > 0 ? 1 : 0.01; }
+  
+  private activate(x: number): number {
+    switch (this.activation) {
+      case 'tanh': return MLPClassifier.tanh(x);
+      case 'relu': return MLPClassifier.relu(x);
+      case 'leaky_relu': return MLPClassifier.leakyRelu(x);
+      default: return MLPClassifier.sigmoid(x);
+    }
+  }
+  
+  private activateDeriv(y: number, z?: number): number {
+    switch (this.activation) {
+      case 'tanh': return MLPClassifier.tanhDeriv(y);
+      case 'relu': return MLPClassifier.reluDeriv(z ?? y);
+      case 'leaky_relu': return MLPClassifier.leakyReluDeriv(z ?? y);
+      default: return MLPClassifier.sigmoidDeriv(y);
+    }
+  }
 
   forward(x: number[]) {
     let a = x.slice();
@@ -109,8 +140,10 @@ export class MLPClassifier {
         z[j] = s;
       }
       if (l < this.weights.length - 1) {
-        a = z.map((v) => MLPClassifier.sigmoid(v));
+        // Hidden layers use selected activation
+        a = z.map((v) => this.activate(v));
       } else {
+        // Output layer always uses sigmoid for binary classification
         a = z.map((v) => MLPClassifier.sigmoid(v));
       }
     }
@@ -139,8 +172,13 @@ export class MLPClassifier {
         z[j] = s;
       }
       zs.push(z);
-  if (l < this.weights.length - 1) a = z.map((v) => MLPClassifier.sigmoid(v));
-  else a = z.map((v) => MLPClassifier.sigmoid(v));
+      if (l < this.weights.length - 1) {
+        // Hidden layers use selected activation
+        a = z.map((v) => this.activate(v));
+      } else {
+        // Output layer uses sigmoid
+        a = z.map((v) => MLPClassifier.sigmoid(v));
+      }
       activations.push(a);
     }
 
@@ -167,7 +205,11 @@ export class MLPClassifier {
             nextDelta[k] += row[k] * delta[i];
           }
         }
-        delta = nextDelta.map((v, idx) => v * MLPClassifier.sigmoidDeriv(activations[l][idx]));
+        // For ReLU/LeakyReLU we need the pre-activation values (z) for the derivative
+        delta = nextDelta.map((v, idx) => {
+          const z_val = zs[l - 1][idx];
+          return v * this.activateDeriv(activations[l][idx], z_val);
+        });
       }
     }
   }
@@ -245,7 +287,7 @@ export class MLPClassifier {
       const L = this.loss(X, y);
       losses.push(L);
       if (typeof onEpoch === "function") {
-        try { onEpoch(epoch, L); } catch (e) { /* allow callback errors to be handled by caller */ }
+        try { onEpoch(epoch, L); } catch { /* allow callback errors to be handled by caller */ }
       }
     }
     return losses;
@@ -271,6 +313,13 @@ export class MLPClassifier {
 
   reset(hidden: number[] | null = null) {
     if (hidden) this.hidden = Array.isArray(hidden) ? hidden : [hidden];
+    this.iter = 0;
+    this.initWeights();
+  }
+  
+  setActivation(activation: ActivationFunction) {
+    this.activation = activation;
+    // Reinitialize weights when changing activation for better convergence
     this.initWeights();
   }
 }

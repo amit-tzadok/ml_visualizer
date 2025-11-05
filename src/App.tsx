@@ -1,10 +1,12 @@
 import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import PerceptronDemo from "./components/PerceptronDemo";
 import CompareDemo from "./components/CompareDemo";
 import KnnDemo from "./components/KnnDemo";
 import MlpDemo from "./components/MlpDemo";
 import Welcome from "./components/Welcome";
+import AgentPanel from "./components/AgentPanel";
+import InfoModal from "./components/InfoModal";
+import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal";
 
 // JS components are not typed yet; create any-typed aliases to avoid prop checks
 const CompareAny: any = CompareDemo as any;
@@ -13,14 +15,13 @@ const KnnAny: any = KnnDemo as any;
 // Use the typed PerceptronDemo directly
 const WelcomeAny: any = Welcome as any;
 import "./App.css";
-import { CopilotPopup } from "@copilotkit/react-ui";
 
 type Theme = "light" | "dark";
 
 const App: React.FC = () => {
   const [classifier, setClassifier] = useState<string>("linear");
   const [compare, setCompare] = useState<boolean>(false);
-  const [runKey, setRunKey] = useState<number>(0);
+  const [runKey, _setRunKey] = useState<number>(0);
   const [theme, setTheme] = useState<Theme>("light");
     // gutterTop keeps the right gutter below the header so header buttons remain clickable
     const [gutterTop, setGutterTop] = useState<number>(12);
@@ -33,7 +34,20 @@ const App: React.FC = () => {
   });
   const [fx, setFx] = useState<boolean>(true);
   const [speedScale, setSpeedScale] = useState<number>(1);
-  const [agentOpen, setAgentOpen] = useState<boolean>(false);
+  const [showAgent, setShowAgent] = useState<boolean>(false);
+  // Training status badge
+  const [trainingStatus, setTrainingStatus] = useState<'idle' | 'training' | 'complete'>('idle');
+  const [accuracy, setAccuracy] = useState<number | null>(null);
+  // Removed under-canvas equation bar
+  // Audio unlock (for subtle chime)
+  const audioCtxRef = React.useRef<any>(null);
+  const [audioUnlocked, setAudioUnlocked] = useState<boolean>(false);
+  // Compare mode tracking
+  const compareRef = React.useRef<boolean>(compare);
+  const compareFinishTrackerRef = React.useRef<Set<string>>(new Set());
+  // New modals
+  const [showInfoModal, setShowInfoModal] = useState<boolean>(false);
+  const [showKeyboardModal, setShowKeyboardModal] = useState<boolean>(false);
 
   const themes = {
     light: {
@@ -64,37 +78,8 @@ const App: React.FC = () => {
 
   const currentTheme = themes[theme];
 
-  // dynamic help box positioning to avoid overlapping header or side popups
-  // now positioned at the bottom-right (left of the chatbot/copilot popup)
-  const [helpPos, setHelpPos] = useState<{ bottom: number; right: number; zIndex: number }>({ bottom: 24, right: 20, zIndex: 1120 });
-
   React.useEffect(() => {
     const compute = () => {
-      // position above the bottom (fixed offset)
-      let bottom = 24;
-
-      // default right offset
-      let right = 20;
-      let zIndex = 1120;
-
-      // try to find a Copilot popup (common patterns) and avoid overlapping it
-      const popup = document.querySelector('[id*="copilot"], [class*="copilot"], [data-testid*="copilot"]');
-      if (popup && popup instanceof HTMLElement) {
-        try {
-          const pr = popup.getBoundingClientRect();
-          // if the popup is on the right side, place help box to the left of it
-          if (pr.left > window.innerWidth / 2) {
-            // compute right so help box sits just left of popup with 12px gap
-            right = Math.max(20, Math.round(window.innerWidth - pr.left + 12));
-          }
-          const popupZ = Number(window.getComputedStyle(popup).zIndex || 0) || 0;
-          if (popupZ && !Number.isNaN(popupZ)) {
-            zIndex = Math.max(1000, popupZ - 10);
-          }
-        } catch (e) {}
-      }
-
-      setHelpPos({ bottom, right, zIndex });
         // compute gutter top based on header bottom to avoid overlaying header
         try {
           const hdr = document.querySelector("header");
@@ -104,7 +89,8 @@ const App: React.FC = () => {
           } else {
             setGutterTop(showWelcome ? 0 : 12);
           }
-        } catch (e) {
+        } catch {
+          // Ignore errors when computing header position
           setGutterTop(showWelcome ? 0 : 12);
         }
     };
@@ -118,12 +104,124 @@ const App: React.FC = () => {
     if (hdr) ro.observe(hdr as Element);
     return () => {
       window.removeEventListener("resize", compute);
-      try { ro.disconnect(); } catch (e) {}
+      try { ro.disconnect(); } catch {
+        // Ignore errors when disconnecting ResizeObserver
+      }
     };
   }, [showWelcome]);
 
+  // keep a live ref of compare mode for the event handler (effect below has empty deps)
+  React.useEffect(() => {
+    compareRef.current = compare;
+    // reset compare tracker when mode toggles
+    compareFinishTrackerRef.current.clear();
+  }, [compare]);
+
+  // Unlock audio context on first user interaction; confetti is not blocked by this
+  React.useEffect(() => {
+    const unlock = () => {
+      try {
+        if (!audioCtxRef.current) {
+          const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+          if (Ctx) audioCtxRef.current = new Ctx();
+        }
+        if (audioCtxRef.current && typeof audioCtxRef.current.resume === 'function') {
+          audioCtxRef.current.resume().then(() => setAudioUnlocked(true)).catch(() => setAudioUnlocked(true));
+        } else {
+          setAudioUnlocked(true);
+        }
+      } catch {
+        setAudioUnlocked(false);
+      }
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    window.addEventListener('touchstart', unlock, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock as EventListener);
+      window.removeEventListener('keydown', unlock as EventListener);
+      window.removeEventListener('touchstart', unlock as EventListener);
+    };
+  }, []);
+
+  // Global keyboard shortcut for help modal disabled: users will use the Agent for questions
+  // (Kept intentionally empty to avoid capturing '?' / Cmd-? which conflicts with typing or Agent usage.)
+  React.useEffect(() => {
+    return () => {};
+  }, []);
+
+  // Listen for demo start/reset events
+  React.useEffect(() => {
+    const handleReset = () => {
+      setTrainingStatus('training');
+      setAccuracy(null);
+    };
+    window.addEventListener('mlv:demo-reset', handleReset);
+    return () => window.removeEventListener('mlv:demo-reset', handleReset);
+  }, []);
+
+  // Listen for demo finished events - update status badge only
+  React.useEffect(() => {
+    const playChime = () => {
+      try {
+        const ac = audioCtxRef.current;
+        if (!ac || !audioUnlocked) return;
+        const now = ac.currentTime;
+        const gain = ac.createGain();
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(0.2, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+
+        const osc1 = ac.createOscillator();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(660, now);
+        osc1.frequency.exponentialRampToValueAtTime(880, now + 0.25);
+        const osc2 = ac.createOscillator();
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(990, now);
+        osc2.frequency.exponentialRampToValueAtTime(1320, now + 0.25);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ac.destination);
+        osc1.start(now);
+        osc2.start(now + 0.02);
+        osc1.stop(now + 0.5);
+        osc2.stop(now + 0.5);
+      } catch {
+        // ignore audio errors
+      }
+    };
+    const handler = (e: Event) => {
+      try {
+        const anyE = e as CustomEvent<any>;
+        const detail = anyE.detail || {};
+        const rawReason: string = detail.reason || 'completed';
+        const isCompleted = rawReason === 'converged' || rawReason === 'max-epochs' || rawReason === 'train-complete' || rawReason === 'max-margin';
+        if (!isCompleted) return;
+
+        // Update status and accuracy
+        setTrainingStatus('complete');
+        if (detail.accuracy !== undefined) {
+          setAccuracy(detail.accuracy);
+        }
+
+        playChime();
+      } catch {
+        // swallow malformed events
+      }
+    };
+    window.addEventListener('mlv:demo-finished', handler as unknown as (e: Event) => void);
+    return () => {
+      window.removeEventListener('mlv:demo-finished', handler as unknown as (e: Event) => void);
+    };
+  }, []);
+
   // fixed gutter on the right to prevent overlays from covering the demo
-  const GUTTER_WIDTH = 380; // px reserved on the right for popups (adjustable)
+  const GUTTER_WIDTH = 400; // px reserved on the right for sidebar and popups (adjustable)
 
   return (
     <div
@@ -189,7 +287,9 @@ const App: React.FC = () => {
             >
             <button
               onClick={() => {
-                try { localStorage.removeItem('mlv_seenWelcome'); } catch {}
+                try { localStorage.removeItem('mlv_seenWelcome'); } catch {
+                  // Ignore localStorage errors
+                }
                 setShowWelcome(true);
               }}
               style={{
@@ -223,6 +323,57 @@ const App: React.FC = () => {
               title="Toggle background visual effects"
             >
               {fx ? "✨ FX On" : "⚡ FX Off"}
+            </button>
+            <button
+              onClick={() => setShowAgent((v) => !v)}
+              style={{
+                padding: "8px 12px",
+                fontSize: "14px",
+                background: showAgent ? currentTheme.accent : currentTheme.controlBg,
+                border: `1px solid ${currentTheme.shadow}`,
+                borderRadius: "8px",
+                cursor: "pointer",
+                color: showAgent ? '#fff' : currentTheme.text,
+                transition: "all 0.2s ease",
+                boxShadow: `0 2px 8px ${currentTheme.shadow}`,
+              }}
+              title="Toggle ML Assistant"
+            >
+              🤖 Agent
+            </button>
+            <button
+              onClick={() => setShowInfoModal(true)}
+              style={{
+                padding: "8px 12px",
+                fontSize: "14px",
+                background: currentTheme.controlBg,
+                border: `1px solid ${currentTheme.shadow}`,
+                borderRadius: "8px",
+                cursor: "pointer",
+                color: currentTheme.text,
+                transition: "all 0.2s ease",
+                boxShadow: `0 2px 8px ${currentTheme.shadow}`,
+              }}
+              title="About & Info"
+            >
+              ℹ️ Info
+            </button>
+            <button
+              onClick={() => setShowKeyboardModal(true)}
+              style={{
+                padding: "8px 12px",
+                fontSize: "14px",
+                background: currentTheme.controlBg,
+                border: `1px solid ${currentTheme.shadow}`,
+                borderRadius: "8px",
+                cursor: "pointer",
+                color: currentTheme.text,
+                transition: "all 0.2s ease",
+                boxShadow: `0 2px 8px ${currentTheme.shadow}`,
+              }}
+              title="Keyboard Shortcuts"
+            >
+              ⌨️
             </button>
             <button
               onClick={() => setTheme(theme === "light" ? "dark" : "light")}
@@ -282,13 +433,11 @@ const App: React.FC = () => {
             position: "relative",
             zIndex: 5,
             boxSizing: "border-box",
-            // reserve space so floating controls don't overlap the demo canvas
-            // when the welcome screen is shown we want a true centered layout,
-            // so set padding to 0 to avoid visual offset caused by the demo padding.
-            paddingBottom: showWelcome ? 0 : 120,
-            // reserve a right gutter for side popups like Copilot/help
-            paddingRight: showWelcome ? 0 : GUTTER_WIDTH,
-            paddingLeft: showWelcome ? 0 : 80,
+            // reserve space for floating controls
+            paddingBottom: showWelcome ? 0 : 80,
+            paddingRight: showWelcome ? 0 : 40,
+            paddingLeft: showWelcome ? 0 : 40,
+            transition: "padding 0.3s ease",
           }}
         >
           {showWelcome ? (
@@ -299,17 +448,31 @@ const App: React.FC = () => {
                 setShowWelcome(false);
                 try {
                   localStorage.setItem("mlv_seenWelcome", "1");
-                } catch {}
+                } catch {
+                  // Ignore localStorage errors
+                }
               }}
             />
           ) : compare ? (
-            <CompareAny
-              key={runKey}
-              leftType={classifier}
-              rightType={classifier === "linear" ? "poly" : "linear"}
-              theme={currentTheme as any}
-              speedScale={speedScale}
-            />
+            <div
+              style={{
+                width: "96%",
+                height: "96%",
+                maxWidth: 1400,
+                maxHeight: 1200,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <CompareAny
+                key={runKey}
+                leftType={classifier}
+                rightType={classifier === "linear" ? "poly" : "linear"}
+                theme={currentTheme as any}
+                speedScale={speedScale}
+              />
+            </div>
           ) : classifier === "knn" ? (
             <KnnAny
               key={runKey}
@@ -361,57 +524,6 @@ const App: React.FC = () => {
           )}
         </div>
       </main>
-
-      {/* interactive right gutter that contains Copilot/help popups so they can
-          open fully without being cut off or overlapped by controls */}
-      {!showWelcome && (
-        <div
-          id="mlv-right-gutter"
-          style={{
-            position: "fixed",
-            top: gutterTop,
-            right: 0,
-            width: GUTTER_WIDTH,
-            bottom: 0,
-            pointerEvents: "auto",
-            zIndex: 1350, // above floating controls (1200) and help box
-            display: "flex",
-            justifyContent: "flex-end",
-            alignItems: "flex-start",
-            padding: 12,
-            boxSizing: "border-box",
-            overflow: "auto",
-            WebkitOverflowScrolling: "touch",
-          }}
-        >
-          <CopilotPopup
-            instructions={
-          `Assistant system context:
-          ML Visualizer is a client-side React app that demonstrates simple ML classifiers (Linear Perceptron, Polynomial Perceptron, MLP, KNN).
-          Key files:
-          - demos: src/components/* (PerceptronDemo, MlpDemo, KnnDemo, CompareDemo)
-          - models: src/utils/* (mlp.ts, perceptron.ts, knn.ts, polynomialClassifier.ts)
-
-          Common actions:
-          - Algorithm dropdown switches demo (label: 'Algorithm').
-          - Add points by clicking canvas: Left = class A (red), Right = class B (blue). On touch devices select 'Touch tap adds' in the Model Controls panel.
-          - Floating panels: Speed (bottom-left), Algorithm+Compare (bottom-center), Model Controls (bottom-right), Help/Controls (top-right).
-          - Useful keys: 'B' adds blue, 'R' adds red, Space toggles play/pause, +/- adjusts speed.
-
-          Answer style:
-          - Prefer short, precise, step-by-step answers for how to run or reproduce things locally.
-          - When asking about code, mention the likely file and functions to check (e.g., 'See src/utils/mlp.ts -> MLPClassifier.fit').
-
-          Example Q/A:
-          Q: How do I retrain the MLP with a higher learning rate?
-          A: Open Model Controls (bottom-right) -> set LR to 0.5 -> click Train (top-left of canvas) or call Train button inside the demo.
-
-          If the user asks for code changes, suggest a minimal patch and test steps.
-          `
-            }
-/>
-        </div>
-      )}
 
       {/* Floating controls (algorithm + compare) */}
       {!showWelcome && (
@@ -517,8 +629,8 @@ const App: React.FC = () => {
         <div
           style={{
             position: "fixed",
-            bottom: 24,
-            left: 24,
+            bottom: 26,
+            left: 90,
             zIndex: 1200,
             padding: "12px 16px",
             borderRadius: 12,
@@ -547,152 +659,83 @@ const App: React.FC = () => {
 
       {/* Speed prompt removed: actions apply immediately at current speedScale */}
 
-      {/* Keyboard help box (changes when KNN selected) - positioned bottom-right, left of chatbot icon */}
-      {!showWelcome && (
-        <div
-          style={{
-            position: "fixed",
-            right: helpPos.right,
-            bottom: helpPos.bottom,
-            background: currentTheme.controlBg,
-            padding: 16,
-            borderRadius: 12,
-            boxShadow: `0 8px 32px ${currentTheme.shadow}`,
-            backdropFilter: "blur(20px)",
-            border: `1px solid ${currentTheme.shadow}`,
-            fontSize: 14,
-            zIndex: helpPos.zIndex,
-            maxWidth: 320,
-            transition: "all 0.3s ease",
-          }}
-          id="mlv-help-box"
-        >
-          <div
-            style={{
-              fontWeight: "600",
-              marginBottom: 8,
-              color: currentTheme.accent,
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            {/* <span>⌨️</span> */}
-            <span>Controls</span>
-          </div>
-          <div style={{ lineHeight: 1.6, color: currentTheme.text }}>
-            {classifier === "knn" ? (
-              <>
-                <div>
-                  <code
-                    style={{
-                      background: currentTheme.shadow,
-                      padding: "2px 4px",
-                      borderRadius: 3,
-                    }}
-                  >
-                    A
-                  </code>{" "}
-                  — Add Class A point (red)
-                </div>
-                <div>
-                  <code
-                    style={{
-                      background: currentTheme.shadow,
-                      padding: "2px 4px",
-                      borderRadius: 3,
-                    }}
-                  >
-                    B
-                  </code>{" "}
-                  — Add Class B point (blue)
-                </div>
-                <div>
-                  <code
-                    style={{
-                      background: currentTheme.shadow,
-                      padding: "2px 4px",
-                      borderRadius: 3,
-                    }}
-                  >
-                    P
-                  </code>{" "}
-                  — Switch to prediction mode, then click to classify a new
-                  point
-                </div>
-                <div style={{ marginTop: 6, opacity: 0.9 }}>
-                  Use the k control in the KNN panel to adjust neighbors.
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <code
-                    style={{
-                      background: currentTheme.shadow,
-                      padding: "2px 4px",
-                      borderRadius: 3,
-                    }}
-                  >
-                    B
-                  </code>{" "}
-                  — Add blue point
-                </div>
-                <div>
-                  <code
-                    style={{
-                      background: currentTheme.shadow,
-                      padding: "2px 4px",
-                      borderRadius: 3,
-                    }}
-                  >
-                    R
-                  </code>{" "}
-                  — Add red point
-                </div>
-                <div>
-                  <code
-                    style={{
-                      background: currentTheme.shadow,
-                      padding: "2px 4px",
-                      borderRadius: 3,
-                    }}
-                  >
-                    Space
-                  </code>{" "}
-                  — Pause/Resume
-                </div>
-
-                <div>
-                  <code
-                    style={{
-                      background: currentTheme.shadow,
-                      padding: "2px 4px",
-                      borderRadius: 3,
-                    }}
-                  >
-                    +
-                  </code>
-                  /
-                  <code
-                    style={{
-                      background: currentTheme.shadow,
-                      padding: "2px 4px",
-                      borderRadius: 3,
-                    }}
-                  >
-                    -
-                  </code>{" "}
-                  — Speed
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
   {/* Copilot Popup is now rendered inside the right gutter above */}
 
-  {/* AgentPanel removed per user request */}
+  {/* Agent Panel */}
+  {!showWelcome && (
+    <AgentPanel
+      classifier={classifier}
+      compare={compare}
+      speedScale={speedScale}
+      theme={currentTheme}
+      isOpen={showAgent}
+      onClose={() => setShowAgent(false)}
+    />
+  )}
+
+  {/* Info Modal */}
+  <InfoModal
+    isOpen={showInfoModal}
+    onClose={() => setShowInfoModal(false)}
+    theme={currentTheme}
+  />
+
+  {/* Keyboard Shortcuts Modal */}
+  <KeyboardShortcutsModal
+    isOpen={showKeyboardModal}
+    onClose={() => setShowKeyboardModal(false)}
+    theme={currentTheme}
+    classifier={classifier}
+  />
+
+  {/* Status badge - hidden for KNN */}
+  {!showWelcome && classifier !== 'knn' && (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 22,
+        right: 200,
+        zIndex: 1300,
+        background: currentTheme.controlBg,
+        border: `2px solid ${
+          trainingStatus === 'complete' ? '#48bb78' :
+          trainingStatus === 'training' ? currentTheme.accent :
+          currentTheme.shadow
+        }`,
+        boxShadow: `0 4px 16px ${currentTheme.shadow}`,
+        borderRadius: 12,
+        padding: '10px 16px',
+        fontSize: 14,
+        fontWeight: '600',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        transition: 'all 0.3s ease',
+      }}
+    >
+      <span style={{ fontSize: 18 }}>
+        {trainingStatus === 'complete' ? '🟢' :
+         trainingStatus === 'training' ? '🟡' :
+         '⚪'}
+      </span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{ color: currentTheme.text }}>
+          {trainingStatus === 'complete' ? 'Complete' :
+           trainingStatus === 'training' ? 'Training...' :
+           'Ready'}
+        </div>
+        {accuracy !== null && (
+          <div style={{ 
+            fontSize: 12, 
+            color: currentTheme.accent,
+            fontFamily: 'monospace'
+          }}>
+            Accuracy: {(accuracy * 100).toFixed(1)}%
+          </div>
+        )}
+      </div>
+    </div>
+  )}
     </div>
   );
 };

@@ -165,35 +165,39 @@ const CompareDemo: React.FC<CompareDemoProps> = ({
           gap: 24,
           justifyContent: "center",
           alignItems: "flex-start",
-          paddingTop: 24,
+          paddingTop: 16,
+          paddingLeft: 100,
+          minWidth: 0, // Allow shrinking below content width
         }}
       >
         <div
           style={{
-            width: 560,
+            flex: "0 0 560px",
             height: 560,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             gap: 8,
+            minWidth: 0, // Allow shrinking
           }}
         >
-          <h3 style={{ textAlign: "center", margin: 0 }}>{leftType}</h3>
-          <div style={{ width: "100%", height: "100%" }}>{renderDemo(leftType, "left")}</div>
+          <h3 style={{ textAlign: "center", margin: 0, fontSize: "18px", fontWeight: "600" }}>{leftType.toUpperCase()}</h3>
+          <div style={{ width: "100%", height: "100%", border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden" }}>{renderDemo(leftType, "left")}</div>
         </div>
 
         <div
           style={{
-            width: 560,
+            flex: "0 0 560px",
             height: 560,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
             gap: 8,
+            minWidth: 0, // Allow shrinking
           }}
         >
-          <h3 style={{ textAlign: "center", margin: 0 }}>{rightType}</h3>
-          <div style={{ width: "100%", height: "100%" }}>{renderDemo(rightType, "right")}</div>
+          <h3 style={{ textAlign: "center", margin: 0, fontSize: "18px", fontWeight: "600" }}>{rightType.toUpperCase()}</h3>
+          <div style={{ width: "100%", height: "100%", border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden" }}>{renderDemo(rightType, "right")}</div>
         </div>
       </div>
     </div>

@@ -29,3 +29,16 @@ declare module './components/Welcome' {
   const Component: ComponentType<any>;
   export default Component;
 }
+
+// Global status published by demos for AgentPanel to read
+declare global {
+  interface Window {
+    mlvStatus?: {
+      classifier?: string;
+      equation?: string | null;
+      weights?: number[];
+      bias?: number;
+      updatedAt?: number;
+    };
+  }
+}

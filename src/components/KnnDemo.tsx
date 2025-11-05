@@ -19,6 +19,15 @@ const KNNDemo: React.FC<KnnProps> = ({ dataset: externalDataset, onDatasetChange
   const pointsRef = useRef<any[]>([]);
   const modeRef = useRef<string>("addA");
   const lastPredictionRef = useRef<any>(null);
+  
+  // Theme detection
+  const prefersDark = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const panelBg = prefersDark ? "rgba(45,55,72,0.95)" : "rgba(255,255,255,0.95)";
+  const panelText = prefersDark ? "#f7fafc" : "#1a202c";
+  const panelBorder = prefersDark ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(0,0,0,0.1)";
+  const inputBg = prefersDark ? "#2d3748" : "#ffffff";
+  const inputColor = panelText;
+  const controlShadow = prefersDark ? "0 8px 32px rgba(0,0,0,0.6)" : "0 8px 32px rgba(0,0,0,0.08)";
 
   useEffect(() => {
     kRef.current = k;
@@ -47,22 +56,37 @@ const KNNDemo: React.FC<KnnProps> = ({ dataset: externalDataset, onDatasetChange
           }
         }
         drawInstructions();
+        // initial paint
+        needsRedraw = true;
       };
 
       const drawInstructions = () => {
-        if (!showInstructions) return;
-        p.fill(0);
-        p.noStroke();
-        p.text("Click to add points", p.width / 2, 20);
-        p.text("Press A to add Class A (red)", p.width / 2, 40);
-        p.text("Press B to add Class B (blue)", p.width / 2, 60);
-        p.text("Press P to predict class (green)", p.width / 2, 80);
-        p.text(
-          `Current mode: ${mode === "addA" ? "Add Class A" : mode === "addB" ? "Add Class B" : "Predict"}`,
-          p.width / 2,
-          100
-        );
+        // Instructions moved to UI overlay
       };
+
+      let needsRedraw = true;
+      const requestRedraw = () => { needsRedraw = true; };
+
+      // Expose a method to recompute neighbor highlights for current K and redraw
+      const recomputeForK = (nextK?: number) => {
+        try {
+          const lp = lastPredictionRef.current;
+          if (!lp || !lp.coords) { requestRedraw(); return; }
+          const baseIdx = points
+            .map((pt: any, i: number) => ({ pt, i }))
+            .filter(({ pt }: any) => pt.label === "A" || pt.label === "B");
+          const kUse = Math.max(1, Math.min(nextK ?? kRef.current, baseIdx.length));
+          const dists = baseIdx.map(({ pt, i }: any) => ({ i, dist: Math.hypot(pt.coords[0] - lp.coords[0], pt.coords[1] - lp.coords[1]) }));
+          dists.sort((a: any, b: any) => a.dist - b.dist);
+          const neighborIndices = dists.slice(0, kUse).map((n: any) => n.i);
+          lastPredictionRef.current = { ...lp, neighbors: neighborIndices };
+          requestRedraw();
+        } catch { requestRedraw(); }
+      };
+
+      // attach helpers on the p5 instance
+      (p as any).recomputeForK = recomputeForK;
+      (p as any).requestRedraw = requestRedraw;
 
       p.windowResized = () => {
         const rect = sketchRef.current?.getBoundingClientRect();
@@ -77,10 +101,11 @@ const KNNDemo: React.FC<KnnProps> = ({ dataset: externalDataset, onDatasetChange
             points.push({ coords: [px, py], label: pt.label });
           }
         }
+        requestRedraw();
       };
 
       const drawPoints = () => {
-        const pts = pointsRef.current || [];
+        const pts = points || [];
         p.clear();
         p.background(255);
         drawInstructions();
@@ -95,7 +120,7 @@ const KNNDemo: React.FC<KnnProps> = ({ dataset: externalDataset, onDatasetChange
         const lp = lastPredictionRef.current;
         if (lp && Array.isArray(lp.neighbors) && lp.neighbors.length > 0) {
           const predictedCoords = lp.coords;
-          lp.neighbors.forEach((nIdx: number, i: number) => {
+          lp.neighbors.forEach((nIdx: number, _i: number) => {
             const npt = pts[nIdx];
             if (!npt) return;
             p.push();
@@ -138,16 +163,26 @@ const KNNDemo: React.FC<KnnProps> = ({ dataset: externalDataset, onDatasetChange
           p.textSize(14);
           p.text(`Predicted: ${lp.label}`, p.width / 2, p.height - 18);
         }
+        needsRedraw = false;
       };
 
       p.mousePressed = () => {
         if (p.mouseX < 0 || p.mouseX > p.width || p.mouseY < 0 || p.mouseY > p.height) return;
+        const controlled = typeof onDatasetChange === 'function';
         if (mode === "addA") {
+          if (controlled) {
+            // In controlled mode (compare view), update parent dataset only
+            const nx = p.map(p.mouseX, 0, p.width, -1, 1);
+            const ny = p.map(p.mouseY, p.height, 0, -1, 1);
+            (onDatasetChange as any)((d: any[]) => [...(Array.isArray(d) ? d : []), { x: nx, y: ny, label: "A" }]);
+            return; // parent re-renders and sketch rebuilds from dataset
+          }
+          // Uncontrolled: update local points
           points.push({ coords: [p.mouseX, p.mouseY], label: "A" });
           if (onDatasetChange) {
             const nx = p.map(p.mouseX, 0, p.width, -1, 1);
             const ny = p.map(p.mouseY, p.height, 0, -1, 1);
-            onDatasetChange((d) => [...(Array.isArray(d) ? d : []), { x: nx, y: ny, label: "A" }]);
+            (onDatasetChange as any)((d: any[]) => [...(Array.isArray(d) ? d : []), { x: nx, y: ny, label: "A" }]);
           }
           if (lastPredictionRef.current && lastPredictionRef.current.coords) {
             const sample = lastPredictionRef.current.coords;
@@ -160,13 +195,19 @@ const KNNDemo: React.FC<KnnProps> = ({ dataset: externalDataset, onDatasetChange
             const neighborIndicesNow = dists.slice(0, Math.max(1, Math.min(kRef.current, dists.length))).map((n) => n.i);
             lastPredictionRef.current = { label: predictedLabelNow, neighbors: neighborIndicesNow, coords: sample };
           }
-          drawPoints();
+          requestRedraw();
         } else if (mode === "addB") {
+          if (controlled) {
+            const nx = p.map(p.mouseX, 0, p.width, -1, 1);
+            const ny = p.map(p.mouseY, p.height, 0, -1, 1);
+            (onDatasetChange as any)((d: any[]) => [...(Array.isArray(d) ? d : []), { x: nx, y: ny, label: "B" }]);
+            return;
+          }
           points.push({ coords: [p.mouseX, p.mouseY], label: "B" });
           if (onDatasetChange) {
             const nx = p.map(p.mouseX, 0, p.width, -1, 1);
             const ny = p.map(p.mouseY, p.height, 0, -1, 1);
-            onDatasetChange((d) => [...(Array.isArray(d) ? d : []), { x: nx, y: ny, label: "B" }]);
+            (onDatasetChange as any)((d: any[]) => [...(Array.isArray(d) ? d : []), { x: nx, y: ny, label: "B" }]);
           }
           if (lastPredictionRef.current && lastPredictionRef.current.coords) {
             const sample = lastPredictionRef.current.coords;
@@ -179,27 +220,28 @@ const KNNDemo: React.FC<KnnProps> = ({ dataset: externalDataset, onDatasetChange
             const neighborIndicesNow = dists.slice(0, Math.max(1, Math.min(kRef.current, dists.length))).map((n) => n.i);
             lastPredictionRef.current = { label: predictedLabelNow, neighbors: neighborIndicesNow, coords: sample };
           }
-          drawPoints();
+          requestRedraw();
         } else if (mode === "predict") {
           if (points.filter((pt) => pt.label === "A" || pt.label === "B").length < kRef.current) {
-            alert(`Need at least ${k} points from each class to predict.`);
+            // Not enough points to make a prediction; silently ignore
             return;
           }
           const baseIdx = points
             .map((pt, i) => ({ pt, i }))
             .filter(({ pt }) => pt.label === "A" || pt.label === "B");
           const predictedLabel = predictKNN(baseIdx.map(({ pt }) => pt), kRef.current, [p.mouseX, p.mouseY]);
-          points.push({ coords: [p.mouseX, p.mouseY], label: predictedLabel });
+          if (controlled) {
+            const nx = p.map(p.mouseX, 0, p.width, -1, 1);
+            const ny = p.map(p.mouseY, p.height, 0, -1, 1);
+            (onDatasetChange as any)((d: any[]) => [...(Array.isArray(d) ? d : []), { x: nx, y: ny, label: predictedLabel }]);
+          } else {
+            points.push({ coords: [p.mouseX, p.mouseY], label: predictedLabel });
+          }
           const dists = baseIdx.map(({ pt, i }) => ({ i, dist: Math.hypot(pt.coords[0] - p.mouseX, pt.coords[1] - p.mouseY) }));
           dists.sort((a, b) => a.dist - b.dist);
           const neighborIndices = dists.slice(0, Math.max(1, Math.min(kRef.current, dists.length))).map((n) => n.i);
           lastPredictionRef.current = { label: predictedLabel, neighbors: neighborIndices, coords: [p.mouseX, p.mouseY] };
-          if (onDatasetChange) {
-            const nx = p.map(p.mouseX, 0, p.width, -1, 1);
-            const ny = p.map(p.mouseY, p.height, 0, -1, 1);
-            onDatasetChange((d) => [...(Array.isArray(d) ? d : []), { x: nx, y: ny, label: predictedLabel }]);
-          }
-          drawPoints();
+          requestRedraw();
         }
       };
 
@@ -212,20 +254,22 @@ const KNNDemo: React.FC<KnnProps> = ({ dataset: externalDataset, onDatasetChange
           mode = "predict";
         }
         modeRef.current = mode;
-        drawPoints();
+        requestRedraw();
       };
 
       p.draw = () => {
-        drawPoints();
+        if (needsRedraw) drawPoints();
       };
 
       p.resetDemo = () => {
-        pointsRef.current = [];
+        points.length = 0; // Clear array in place
         lastPredictionRef.current = null;
         try {
-          if (onDatasetChange) onDatasetChange([]);
-        } catch {}
-        drawPoints();
+          if (onDatasetChange) (onDatasetChange as any)([]);
+        } catch {
+          // Ignore callback errors
+        }
+        requestRedraw();
       };
     };
 
@@ -245,51 +289,156 @@ const KNNDemo: React.FC<KnnProps> = ({ dataset: externalDataset, onDatasetChange
 
   useEffect(() => {
     kRef.current = k;
-    const lp = lastPredictionRef.current;
-    if (lp && lp.coords) {
-      const pts = pointsRef.current || [];
-      const baseIdx = pts
-        .map((pt, i) => ({ pt, i }))
-        .filter(({ pt }) => pt.label === "A" || pt.label === "B");
-      const dists = baseIdx.map(({ pt, i }) => ({ i, dist: Math.hypot(pt.coords[0] - lp.coords[0], pt.coords[1] - lp.coords[1]) }));
-      dists.sort((a, b) => a.dist - b.dist);
-      const neighborIndices = dists.slice(0, Math.max(1, Math.min(kRef.current, dists.length))).map((n) => n.i);
-      lastPredictionRef.current = { ...lp, neighbors: neighborIndices };
-    }
+    // Ask p5 to recompute neighbor highlights immediately and redraw
+    try {
+      if (p5InstanceRef.current && typeof p5InstanceRef.current.recomputeForK === 'function') {
+        p5InstanceRef.current.recomputeForK(k);
+      }
+    } catch {}
   }, [k]);
 
   return (
-    <div ref={sketchRef} style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
-      <div style={{ position: "absolute", left: 0, top: 0, right: 0 }} />
-      <div style={{ marginTop: "10px", position: "relative", zIndex: 10 }}>
+    <div ref={sketchRef} style={{ position: "relative", width: "calc(100% - 280px)", height: "92%", overflow: "hidden", marginLeft: "-200px" }}>
+  {/* Clear button */}
+      <div style={{ 
+        position: "absolute", 
+        left: 12, 
+        top: 12, 
+        zIndex: 20 
+      }}>
         <button
-          id="knn-reset"
+          id="knn-clear"
           onClick={() => {
             if (p5InstanceRef.current && typeof p5InstanceRef.current.resetDemo === "function") {
               p5InstanceRef.current.resetDemo();
             }
           }}
-          style={{ marginRight: "10px", padding: "4px 8px", borderRadius: 8 }}
+          style={{
+            padding: '8px 16px',
+            fontSize: 12,
+            fontWeight: 600,
+            background: panelBg,
+            color: panelText,
+            border: panelBorder,
+            borderRadius: 8,
+            cursor: 'pointer',
+            backdropFilter: 'blur(10px)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+          }}
         >
-          Reset
+          🧹 Clear
         </button>
-        <label>
-          k (number of neighbors):
-          <input type="number" value={k} min={1} max={20} onChange={(e) => setK(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))} style={{ marginLeft: "10px", width: "50px" }} />
-        </label>
       </div>
+
+      {/* Instructions overlay */}
       {showInstructions && (
-        <div style={{ marginTop: "10px" }}>
-          <strong>Instructions:</strong>
-          <ul>
-            <li>Click on the canvas to add points.</li>
-            <li>Press 'A' to switch to adding Class A points (red).</li>
-            <li>Press 'B' to switch to adding Class B points (blue).</li>
-            <li>Press 'P' to switch to prediction mode (green).</li>
-            <li>In prediction mode, click to classify a new point based on existing points.</li>
-          </ul>
+        <div style={{ 
+          position: "absolute", 
+          left: 12, 
+          top: 60, 
+          zIndex: 20, 
+          maxWidth: 280,
+          background: panelBg,
+          backdropFilter: 'blur(10px)',
+          borderRadius: 10,
+          padding: '10px 12px',
+          border: panelBorder,
+          boxShadow: controlShadow
+        }}>
+          <div style={{ fontSize: 12, color: panelText, lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 11, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.5px' }}>🔍 K-Nearest Neighbors</div>
+            <div style={{ fontSize: 11, opacity: 0.9 }}>
+              <span style={{ fontWeight: 600 }}>Click:</span> Add points<br/>
+              <span style={{ fontWeight: 600 }}>A key:</span> Red (Class A)<br/>
+              <span style={{ fontWeight: 600 }}>B key:</span> Blue (Class B)<br/>
+              <span style={{ fontWeight: 600 }}>P key:</span> Predict (Green)
+            </div>
+          </div>
         </div>
       )}
+
+      {/* Control panel - K value */}
+      <div style={{ 
+        position: "fixed", 
+        right: 16, 
+        top: 86, 
+        zIndex: 1150,
+        padding: '12px', 
+        background: panelBg, 
+        borderRadius: '12px', 
+        width: 240, 
+        boxSizing: 'border-box', 
+        color: panelText, 
+        border: panelBorder, 
+        boxShadow: controlShadow 
+      }}>
+        <div style={{ 
+          marginBottom: 10, 
+          paddingBottom: 8, 
+          borderBottom: `1px solid ${prefersDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+          fontSize: 13,
+          fontWeight: 600,
+          letterSpacing: '0.3px'
+        }}>
+          ⚙️ Model Controls
+        </div>
+        
+        <div style={{ marginBottom: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Parameters</div>
+          <div>
+            <label style={{ fontSize: 11, color: panelText, opacity: 0.8, display: 'block', marginBottom: 4 }}>
+              K (Neighbors)
+            </label>
+            <input 
+              type="number" 
+              value={k} 
+              min={1} 
+              max={20} 
+              onChange={(e) => setK(Math.max(1, Math.min(20, parseInt(e.target.value) || 1)))}
+              onInput={(e) => setK(Math.max(1, Math.min(20, parseInt((e.target as HTMLInputElement).value) || 1)))} 
+              style={{ 
+                width: '100%', 
+                padding: '6px 8px',
+                fontSize: 13,
+                background: inputBg, 
+                color: inputColor, 
+                borderRadius: 6, 
+                border: panelBorder,
+                boxSizing: 'border-box'
+              }} 
+            />
+          </div>
+        </div>
+
+        <div style={{ 
+          marginTop: 12,
+          padding: '8px',
+          background: prefersDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+          borderRadius: 6,
+          fontSize: 11,
+          lineHeight: 1.5
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 4, opacity: 0.7 }}>Current Mode:</div>
+          <div style={{ 
+            fontSize: 12, 
+            fontWeight: 600,
+            color: modeRef.current === "addA" ? '#e53e3e' : modeRef.current === "addB" ? '#3182ce' : '#38a169'
+          }}>
+            {modeRef.current === "addA" ? "🔴 Add Class A (Red)" : 
+             modeRef.current === "addB" ? "🔵 Add Class B (Blue)" : 
+             "🟢 Predict Class"}
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

@@ -56,10 +56,13 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
       let points: any[] = [],
         X: any[] = [],
         y: any[] = [];
-      let gridG: any = null; // offscreen graphics for decision background (poly & linear)
-      const defaultGridStep = 8;
-      let gridStep = defaultGridStep;
-      let gridFreq = 6; // frames between recomputing grid
+  let gridG: any = null; // offscreen graphics for decision background (poly & linear)
+  // Adaptive grid resolution for performance: coarse during training, fine when paused
+  let fineGridStep = 6;
+  let coarseGridStep = 14;
+  let gridStep = coarseGridStep;
+  let gridFreq = 18; // update less often during training
+  let wasPaused = false;
       let model: any,
         paused = false,
         speed =
@@ -70,6 +73,12 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
         epoch = 0,
         indexInEpoch = 0,
         errorsInEpoch = 0;
+  // track mistakes per epoch to detect convergence and notify once
+  let mistakesThisEpoch = 0;
+  let zeroEpochStreak = 0; // require consecutive zero-mistake epochs to be robust
+  let notifiedDone = false;
+  // When finishing, defer heavy background repaints briefly so success animation can appear immediately
+  let finishedAtMs = 0;
       const MAX_EPOCHS = 1000;
 
       const createRawModel = () =>
@@ -77,33 +86,71 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
           ? new PolynomialPerceptron(2, 0.05, 1)
           : new Perceptron(2, 0.05, 1);
 
-      const adaptModel = (m: any) => ({
-        raw: m,
-        predict: (sample: any) => {
-          if (!m) return 0;
-          if (typeof m.predict === "function") return m.predict(sample);
-          if (m.raw && typeof m.raw.predict === "function") return m.raw.predict(sample);
-          return 0;
-        },
-        trainSample: (sample: any, label: any) => {
-          if (!m) return;
-          if (typeof m.trainSample === "function") return m.trainSample(sample, label);
-          if (typeof m.fit === "function") return m.fit([sample], [label]);
-        },
-        get weights() {
-          return m.weights || (m.raw && m.raw.weights) || [];
-        },
-        get bias() {
-          return m.bias || (m.raw && m.raw.bias) || 0;
-        },
-      });
+  const adaptModel = (m: any) => ({
+    raw: m,
+    predict: (sample: any) => {
+      if (!m) return 0;
+      if (typeof m.predict === "function") return m.predict(sample);
+      if (m.raw && typeof m.raw.predict === "function") return m.raw.predict(sample);
+      return 0;
+    },
+    predictRaw: (sample: any) => {
+      if (!m) return 0;
+      if (typeof m.predictRaw === "function") return m.predictRaw(sample);
+      if (m.raw && typeof m.raw.predictRaw === "function") return m.raw.predictRaw(sample);
+      return 0;
+    },
+    trainSample: (sample: any, label: any) => {
+      if (!m) return;
+      if (typeof m.trainSample === "function") return m.trainSample(sample, label);
+      if (typeof m.fit === "function") return m.fit([sample], [label]);
+    },
+    get weights() {
+      return (
+        (m && m.weights) ||
+        (m && m.model && m.model.weights) ||
+        (m && m.raw && m.raw.weights) ||
+        (m && m.raw && m.raw.model && m.raw.model.weights) ||
+        []
+      );
+    },
+    get bias() {
+      return (
+        (m && typeof m.bias === 'number' && m.bias) ||
+        (m && m.model && typeof m.model.bias === 'number' && m.model.bias) ||
+        (m && m.raw && typeof m.raw.bias === 'number' && m.raw.bias) ||
+        (m && m.raw && m.raw.model && typeof m.raw.model.bias === 'number' && m.raw.model.bias) ||
+        0
+      );
+    },
+  });
+      const getCurrentEquation = () => {
+        try {
+          const w = (model && (model as any).weights) || [];
+          const b = (model && (model as any).bias) || 0;
+          if (classifierType === 'linear') return w.length >= 2 ? buildLinearEquation(w, b) : 'linear: insufficient weights';
+          return buildPolyEquation(w, b);
+        } catch { return ''; }
+      };
+      // Cached best result for Maximize Margin to keep results stable per dataset
+      let lastMaximizeSig: string | null = null;
+      let lastBestModel: any = null;
 
       const reset = () => {
         model = adaptModel(createRawModel());
         points = [];
         X = [];
         y = [];
-        epoch = indexInEpoch = errorsInEpoch = 0;
+  epoch = indexInEpoch = errorsInEpoch = 0;
+  zeroEpochStreak = 0;
+        mistakesThisEpoch = 0;
+        notifiedDone = false;
+        lastMaximizeSig = null; lastBestModel = null;
+        paused = false;
+        trainingAccumulator = 0;
+        wasPaused = false;
+        try { gridG && gridG.clear(); } catch {}
+        try { computeGridSteps(); } catch {}
         for (let i = 0; i < 50; i++) {
           const vx = p.random(-1, 1),
             vy = p.random(-1, 1);
@@ -129,22 +176,52 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
           }
         }
         model = adaptModel(createRawModel());
-        epoch = indexInEpoch = errorsInEpoch = 0;
+  epoch = indexInEpoch = errorsInEpoch = 0;
+  zeroEpochStreak = 0;
+        mistakesThisEpoch = 0;
+  notifiedDone = false;
+  lastMaximizeSig = null; lastBestModel = null;
+        paused = false;
+        trainingAccumulator = 0;
+        wasPaused = false;
+        try { gridG && gridG.clear(); } catch {}
+        try { computeGridSteps(); } catch {}
       };
 
       const safeTrainSample = (sample: any, label: any) => {
         try {
           model.trainSample(sample, label);
-        } catch (e) {
+        } catch {
+          // Ignore training errors
           model = adaptModel(createRawModel());
         }
       };
-      const safePredict = (sample: any) => {
-        try {
-          return model.predict(sample);
-        } catch (e) {
-          model = adaptModel(createRawModel());
-          return 0;
+  const safePredict = (sample: any) => {
+    try {
+      return model.predict(sample);
+    } catch {
+      // Ignore prediction errors
+      model = adaptModel(createRawModel());
+      return 0;
+    }
+  };
+
+  const safePredictRaw = (sample: any) => {
+    try {
+      return model.predictRaw(sample);
+    } catch {
+      // Ignore prediction errors
+      model = adaptModel(createRawModel());
+      return 0;
+    }
+  };      const computeGridSteps = () => {
+        const minDim = Math.max(1, Math.min(p.width || 600, p.height || 600));
+        const base = Math.max(4, Math.floor(minDim / 90)); // ~90 cells on short side
+        fineGridStep = base; // fine when paused
+        coarseGridStep = Math.max(8, base * 2); // coarse while training
+        if (externalDataset && Array.isArray(externalDataset) && externalDataset.length > 150) {
+          fineGridStep = Math.max(fineGridStep, 8);
+          coarseGridStep = Math.max(coarseGridStep, 16);
         }
       };
 
@@ -156,7 +233,9 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
         const w = Math.max(300, rect?.width || 600);
         const h = Math.max(300, rect?.height || 600);
         p.createCanvas(w, h);
+        try { p.pixelDensity?.(1); } catch {}
         gridG = p.createGraphics(p.width, p.height);
+        computeGridSteps();
         if (sketchRef.current) {
           sketchRef.current.querySelectorAll(".pd-fallback, .pd-status").forEach((el) => el.remove());
         }
@@ -168,28 +247,90 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
 
         p.maximizeMargin = (options: any = {}) => {
           try {
-            const opts = Object.assign({ epochs: 150, lr: 0.01, lambda: 0.001, shuffle: true }, options);
-            if (!X || !X.length) return;
-            if (model && model.raw && typeof model.raw.fitHingeSGD === "function") {
-              model.raw.fitHingeSGD(X, y, opts);
-            } else if (model && typeof model.fitHingeSGD === "function") {
-              model.fitHingeSGD(X, y, opts);
+            if (!Array.isArray(X) || X.length === 0) {
+              return;
+            }
+            // Hyperparameter sweeps + multi-restarts to find a strong separator in one click
+            const base = { epochs: 120, lr: 0.01, lambda: 0.001, shuffle: true, ...options } as { epochs: number; lr: number; lambda: number; shuffle: boolean };
+            const lrs = options.lr ? [options.lr] : [0.005, 0.01, 0.02, 0.04];
+            const lambdas = options.lambda ? [options.lambda] : [0.0005, 0.001, 0.003];
+            const epochs = Math.max(80, base.epochs);
+            const restarts = 3; // random init restarts per combo
+
+            type Cand = { err: number; hinge: number; model: any };
+            let best: Cand | null = null;
+
+            // Build dataset signature to cache best results for this exact data
+            const sig = (() => {
+              try {
+                const n = X.length;
+                const lab = (y || []).map((v: any) => (v === 1 ? '1' : '0')).join('');
+                const coords = X.slice(0, 120).map((row: number[]) => `${Number(row[0]).toFixed(3)},${Number(row[1]).toFixed(3)}`).join('|');
+                return `${n}|${lab}|${coords}`;
+              } catch { return `n${X && X.length}`; }
+            })();
+
+            if (lastMaximizeSig && sig === lastMaximizeSig && lastBestModel) {
+              // Reuse best model from cache for identical dataset
+              model = adaptModel(lastBestModel);
+              paused = true;
+              notifiedDone = true;
+              try { gridG && gridG.clear(); } catch {}
+              // Calculate accuracy
+              let accuracy = 1.0;
+              try {
+                if (typeof (lastBestModel as any).misclassificationRate === 'function') {
+                  const errorRate = (lastBestModel as any).misclassificationRate(X, y);
+                  accuracy = 1.0 - errorRate;
+                }
+              } catch {}
+              try { window.dispatchEvent(new CustomEvent('mlv:demo-finished', { detail: { classifier: classifierType === 'poly' ? 'Polynomial Perceptron' : 'Linear Perceptron', reason: 'max-margin', accuracy } })); } catch {}
+              return;
             }
 
-            if (gridG) {
-              gridG.clear();
-              const darkMode = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-              const step = gridStep || defaultGridStep;
-              for (let px = 0; px < p.width; px += step) {
-                for (let py = 0; py < p.height; py += step) {
-                  const vx = p.map(px + step / 2, 0, p.width, -1, 1);
-                  const vy = p.map(py + step / 2, p.height, 0, -1, 1);
-                  const pred = safePredict([vx, vy]);
-                  gridG.noStroke();
-                  gridG.fill(pred === 1 ? (darkMode ? "rgba(80,150,255,0.3)" : "rgba(200,230,255,0.9)") : (darkMode ? "rgba(255,100,100,0.3)" : "rgba(255,220,220,0.9)"));
-                  gridG.rect(px, py, step, step);
+            const evalCandidate = (m: any): Cand => {
+              // Both Perceptron and PolynomialPerceptron expose these metrics
+              let err = Number.POSITIVE_INFINITY;
+              let hinge = Number.POSITIVE_INFINITY;
+              try { err = typeof m.misclassificationRate === 'function' ? m.misclassificationRate(X, y) : err; } catch {}
+              try { hinge = typeof m.hingeLoss === 'function' ? m.hingeLoss(X, y) : hinge; } catch {}
+              return { err: isFinite(err) ? err : 1e9, hinge: isFinite(hinge) ? hinge : 1e9, model: m };
+            };
+
+            for (const lr of lrs) {
+              for (const lambda of lambdas) {
+                for (let r = 0; r < restarts; r++) {
+                  const m = createRawModel();
+                  try {
+                    if (typeof (m as any).fitHingeSGD === 'function') (m as any).fitHingeSGD(X, y, { epochs, lr, lambda, shuffle: true });
+                    else if ((m as any).raw && typeof (m as any).raw.fitHingeSGD === 'function') (m as any).raw.fitHingeSGD(X, y, { epochs, lr, lambda, shuffle: true });
+                  } catch {}
+                  const cand = evalCandidate(m);
+                  if (!best || cand.err < best.err - 1e-9 || (Math.abs(cand.err - best.err) < 1e-9 && cand.hinge < best.hinge)) {
+                    best = cand;
+                  }
                 }
               }
+            }
+
+            if (best && best.model) {
+              // Replace current model with best candidate and pause training so result persists
+              model = adaptModel(best.model);
+              lastMaximizeSig = sig; lastBestModel = best.model;
+              paused = true;
+              notifiedDone = true; // don't auto-retrain/celebrate
+              // Force a background repaint once to reflect the new boundary
+              try { gridG && gridG.clear(); } catch {}
+              // Calculate accuracy
+              let accuracy = 1.0;
+              try {
+                if (typeof (best.model as any).misclassificationRate === 'function') {
+                  const errorRate = (best.model as any).misclassificationRate(X, y);
+                  accuracy = 1.0 - errorRate;
+                }
+              } catch {}
+              // Notify the app so success animation/toast/equation bar update
+              try { window.dispatchEvent(new CustomEvent('mlv:demo-finished', { detail: { classifier: classifierType === 'poly' ? 'Polynomial Perceptron' : 'Linear Perceptron', reason: 'max-margin', accuracy } })); } catch {}
             }
           } catch (e) {
             console.error("maximizeMargin error", e);
@@ -201,85 +342,270 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
         const rect = sketchRef.current?.getBoundingClientRect();
         p.resizeCanvas(Math.max(300, rect?.width || 600), Math.max(300, rect?.height || 600));
         gridG = p.createGraphics(p.width, p.height);
+        computeGridSteps();
       };
 
       p.draw = () => {
         if (!paused && X.length && epoch < MAX_EPOCHS) {
-          const effectiveSpeed = speed * (p.speedScale || 1);
+          const effectiveSpeed = speed * (p.speedScale || 1); // Training speed
           trainingAccumulator += effectiveSpeed;
           let steps = Math.floor(trainingAccumulator);
           if (steps > 0) {
             trainingAccumulator -= steps;
+            // Limit training steps per frame to prevent blocking
+            steps = Math.min(steps, 5);
             for (let s = 0; s < steps; s++) {
               const xi = X[indexInEpoch],
                 yi = y[indexInEpoch];
               const predBefore = safePredict(xi);
-              if (predBefore !== yi) errorsInEpoch++;
+              if (predBefore !== yi) {
+                errorsInEpoch++;
+                mistakesThisEpoch++;
+              }
               safeTrainSample(xi, yi);
               indexInEpoch++;
               if (indexInEpoch >= X.length) {
                 epoch++;
                 indexInEpoch = 0;
                 errorsInEpoch = 0;
-                if (epoch >= MAX_EPOCHS) paused = true;
+                // Check for convergence: zero mistakes this epoch
+                if (mistakesThisEpoch === 0) {
+                  zeroEpochStreak++;
+                  // Converged if we have 2 consecutive zero-mistake epochs, or 1 zero-mistake epoch after epoch 5
+                  const hasConverged = (zeroEpochStreak >= 2 && epoch >= 2) || (zeroEpochStreak >= 1 && epoch >= 5);
+                  if (hasConverged && !paused && !notifiedDone) {
+                    paused = true;
+                    notifiedDone = true;
+                    finishedAtMs = (performance && performance.now) ? performance.now() : Date.now();
+                    try {
+                      // publish latest equation before notifying
+                      try {
+                        const eq = getCurrentEquation();
+                        (window as any).mlvStatus = { classifier: classifierType, equation: eq, weights: (model as any).weights, bias: (model as any).bias, updatedAt: Date.now() };
+                      } catch {}
+                      // Calculate accuracy
+                      let accuracy = 1.0;
+                      try {
+                        if (typeof (model as any).misclassificationRate === 'function') {
+                          const errorRate = (model as any).misclassificationRate(X, y);
+                          accuracy = 1.0 - errorRate;
+                        }
+                      } catch {}
+                      window.dispatchEvent(
+                        new CustomEvent("mlv:demo-finished", {
+                          detail: { 
+                            classifier: classifierType === "poly" ? "Polynomial Perceptron" : "Linear Perceptron", 
+                            reason: "converged", 
+                            epoch, 
+                            equation: getCurrentEquation(),
+                            accuracy 
+                          },
+                        })
+                      );
+                    } catch {}
+                    // banner removed; App now shows equation under the canvas
+                  }
+                } else {
+                  zeroEpochStreak = 0;
+                }
+                // reset counter for next epoch
+                mistakesThisEpoch = 0;
+                if (epoch >= MAX_EPOCHS && !notifiedDone) {
+                  paused = true;
+                  notifiedDone = true;
+                  finishedAtMs = (performance && performance.now) ? performance.now() : Date.now();
+                  try {
+                    try {
+                      const eq = getCurrentEquation();
+                      (window as any).mlvStatus = { classifier: classifierType, equation: eq, weights: (model as any).weights, bias: (model as any).bias, updatedAt: Date.now() };
+                    } catch {}
+                    // Calculate accuracy
+                    let accuracy = 1.0;
+                    try {
+                      if (typeof (model as any).misclassificationRate === 'function') {
+                        const errorRate = (model as any).misclassificationRate(X, y);
+                        accuracy = 1.0 - errorRate;
+                      }
+                    } catch {}
+                    window.dispatchEvent(
+                      new CustomEvent("mlv:demo-finished", {
+                        detail: { 
+                          classifier: classifierType === "poly" ? "Polynomial Perceptron" : "Linear Perceptron", 
+                          reason: "max-epochs", 
+                          epoch, 
+                          equation: getCurrentEquation(),
+                          accuracy 
+                        },
+                      })
+                    );
+                  } catch {}
+                  // banner removed; App now shows equation under the canvas
+                }
               }
             }
           }
         }
 
-        const darkMode = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-        p.background(darkMode ? 30 : 255);
+  // cache color scheme once per frame
+  const isDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  // Celebration grace window: skip heavy redraws for a short time after finish so confetti shows instantly
+  const celebrateGrace = () => {
+    const now = (performance && performance.now) ? performance.now() : Date.now();
+    return notifiedDone && finishedAtMs && (now - finishedAtMs) < 500; // 0.5s grace
+  };
+  p.background(isDark ? 30 : 255);
 
-        if (classifierType === "poly" || classifierType === "linear") {
-          if (externalDataset && Array.isArray(externalDataset) && externalDataset.length) {
-            gridStep = Math.max(20, defaultGridStep * 3);
-            gridFreq = 60;
-          } else {
-            gridStep = defaultGridStep;
-            gridFreq = 6;
-          }
-
+        if (classifierType === "poly") {
+          // Grid-based fill for non-linear boundaries
+          // During celebration grace, keep coarse grid to avoid heavy recompute immediately
+          const inGrace = celebrateGrace();
+          gridStep = paused && !inGrace ? fineGridStep : coarseGridStep;
+          gridFreq = paused && !inGrace ? 60 : 18;
           if (!gridG) gridG = p.createGraphics(p.width, p.height);
-
-          if (p.frameCount % gridFreq === 0) {
+          if (wasPaused !== paused) {
+            wasPaused = paused;
+            // Avoid clearing immediately on finish; let existing grid persist under confetti
+            if (!inGrace) try { gridG.clear(); } catch {}
+          }
+          if (!inGrace && (p.frameCount % gridFreq === 0 || wasPaused !== paused)) {
             gridG.clear();
-            for (let px = 0; px < p.width; px += gridStep) {
-              for (let py = 0; py < p.height; py += gridStep) {
-                const vx = p.map(px + gridStep / 2, 0, p.width, -1, 1);
-                const vy = p.map(py + gridStep / 2, p.height, 0, -1, 1);
+            const step = Math.max(2, gridStep);
+            gridG.noStroke();
+            for (let px = 0; px < p.width; px += step) {
+              for (let py = 0; py < p.height; py += step) {
+                const vx = p.map(px + step / 2, 0, p.width, -1, 1);
+                const vy = p.map(py + step / 2, p.height, 0, -1, 1);
                 const pred = safePredict([vx, vy]);
-                gridG.noStroke();
-                gridG.fill(pred === 1 ? (darkMode ? "rgba(80,150,255,0.3)" : "rgba(200,230,255,0.9)") : (darkMode ? "rgba(255,100,100,0.3)" : "rgba(255,220,220,0.9)"));
-                gridG.rect(px, py, gridStep, gridStep);
+                gridG.fill(
+                  pred === 1
+                    ? (isDark ? "rgba(80,150,255,0.3)" : "rgba(200,230,255,0.9)")
+                    : (isDark ? "rgba(255,100,100,0.3)" : "rgba(255,220,220,0.9)")
+                );
+                const rectWidth = Math.min(step, p.width - px);
+                const rectHeight = Math.min(step, p.height - py);
+                gridG.rect(px, py, rectWidth, rectHeight);
               }
             }
           }
+          p.image(gridG, 0, 0);
+        } else if (classifierType === "linear") {
+          // Smooth, straight separation without grid: repaint background only when needed
+          if (!gridG) gridG = p.createGraphics(p.width, p.height);
+          const classA = isDark ? "rgba(80,150,255,0.3)" : "rgba(200,230,255,0.9)";
+          const classB = isDark ? "rgba(255,100,100,0.3)" : "rgba(255,220,220,0.9)";
+          const inGrace = celebrateGrace();
+          // Keep coarse fill during grace to avoid a full-width repaint in the finish frame
+          const colStep = (paused && !inGrace) ? 1 : 2; // finer when fully paused, coarse during grace
+          const wts = model.weights || [];
+          const b = model.bias || 0;
 
+          // Track last rendered state to avoid per-frame recomputation
+          (p as any)._linLast = (p as any)._linLast || { w0: NaN, w1: NaN, b: NaN, colStep: NaN, w: 0, h: 0 };
+          const last = (p as any)._linLast;
+          const w0 = wts[0] ?? NaN;
+          const w1 = wts[1] ?? NaN;
+          const sizeChanged = last.w !== p.width || last.h !== p.height;
+          const colChanged = last.colStep !== colStep;
+          const weightsChanged = !(Math.abs(last.w0 - w0) < 1e-6 && Math.abs(last.w1 - w1) < 1e-6 && Math.abs(last.b - b) < 1e-6);
+
+          const shouldRepaint = (sizeChanged || colChanged || weightsChanged) && !inGrace;
+          const throttle = paused ? 1 : 0; // repaint immediately when paused, otherwise throttle via frame cadence below
+          if (shouldRepaint && (throttle || (p.frameCount % 6 === 0))) {
+            gridG.clear();
+            gridG.noStroke();
+            if (wts.length >= 2) {
+              if (Math.abs(w1) > 1e-8) {
+                for (let x = 0; x < p.width; x += colStep) {
+                  const nx = p.map(x + colStep / 2, 0, p.width, -1, 1);
+                  const yNorm = -(w0 * nx + b) / w1; // boundary y in normalized coords
+                  const yPix = p.map(yNorm, -1, 1, p.height, 0);
+                  // sample a point just above and just below the boundary to decide colors
+                  const yTopNorm = p.map(Math.max(0, yPix - 1), p.height, 0, -1, 1);
+                  const yBotNorm = p.map(Math.min(p.height, yPix + 1), p.height, 0, -1, 1);
+                  const predTop = safePredict([nx, yTopNorm]) === 1;
+                  const predBot = safePredict([nx, yBotNorm]) === 1;
+                  const topH = Math.max(0, Math.min(p.height, yPix));
+                  const botY = Math.max(0, Math.min(p.height, yPix));
+                  if (topH > 0) {
+                    gridG.fill(predTop ? classA : classB);
+                    gridG.rect(x, 0, colStep, topH);
+                  }
+                  if (botY < p.height) {
+                    gridG.fill(predBot ? classA : classB);
+                    gridG.rect(x, botY, colStep, p.height - botY);
+                  }
+                }
+              } else if (Math.abs(w0) > 1e-8) {
+                // Vertical boundary: x = -b / w0
+                const xNorm = -b / w0;
+                const xPix = p.map(xNorm, -1, 1, 0, p.width);
+                // sample left and right
+                const leftPred = safePredict([p.map(Math.max(0, xPix - 1), 0, p.width, -1, 1), 0]) === 1;
+                const rightPred = safePredict([p.map(Math.min(p.width, xPix + 1), 0, p.width, -1, 1), 0]) === 1;
+                const leftW = Math.max(0, Math.min(p.width, xPix));
+                const rightX = Math.max(0, Math.min(p.width, xPix));
+                if (leftW > 0) {
+                  gridG.fill(leftPred ? classA : classB);
+                  gridG.rect(0, 0, leftW, p.height);
+                }
+                if (rightX < p.width) {
+                  gridG.fill(rightPred ? classA : classB);
+                  gridG.rect(rightX, 0, p.width - rightX, p.height);
+                }
+              } else {
+                // Degenerate: fill with majority prediction at center
+                const centerPred = safePredict([0, 0]) === 1;
+                gridG.fill(centerPred ? classA : classB);
+                gridG.rect(0, 0, p.width, p.height);
+              }
+            }
+            // record last rendered state
+            last.w0 = w0; last.w1 = w1; last.b = b; last.colStep = colStep; last.w = p.width; last.h = p.height;
+          }
           p.image(gridG, 0, 0);
         }
 
         const weights = model.weights || [];
         const bias = model.bias || 0;
 
-        if (classifierType === "linear" && weights.length >= 2 && Math.abs(weights[1]) > 1e-6) {
-          p.stroke(darkMode ? 255 : 0, 150, 255);
-          const x1 = -1,
-            x2 = 1;
-          const y1 = -(weights[0] * x1 + bias) / weights[1];
-          const y2 = -(weights[0] * x2 + bias) / weights[1];
-          p.line(
-            p.map(x1, -1, 1, 0, p.width),
-            p.map(y1, -1, 1, p.height, 0),
-            p.map(x2, -1, 1, 0, p.width),
-            p.map(y2, -1, 1, p.height, 0)
-          );
+        // Publish equation to global for AgentPanel
+        try {
+          if (classifierType === "linear") {
+            const eq = weights.length >= 2 ? buildLinearEquation(weights, bias) : "linear: insufficient weights";
+            (window as any).mlvStatus = { classifier: "linear", equation: eq, weights, bias, updatedAt: Date.now() };
+          } else if (classifierType === "poly") {
+            const eq = buildPolyEquation(weights, bias);
+            (window as any).mlvStatus = { classifier: "poly", equation: eq, weights, bias, updatedAt: Date.now() };
+          }
+        } catch {}
+
+  if (classifierType === "linear" && notifiedDone && weights.length >= 2) {
+    p.stroke(isDark ? 255 : 0, 150, 255);
+          const w0 = weights[0];
+          const w1 = weights[1];
+          if (Math.abs(w1) > 1e-6) {
+            const x1 = -1, x2 = 1;
+            const y1 = -(w0 * x1 + bias) / w1;
+            const y2 = -(w0 * x2 + bias) / w1;
+            p.line(
+              p.map(x1, -1, 1, 0, p.width),
+              p.map(y1, -1, 1, p.height, 0),
+              p.map(x2, -1, 1, 0, p.width),
+              p.map(y2, -1, 1, p.height, 0)
+            );
+          } else if (Math.abs(w0) > 1e-6) {
+            // vertical boundary: x = -b / w0
+            const xNorm = -bias / w0;
+            const xPix = p.map(xNorm, -1, 1, 0, p.width);
+            p.line(xPix, 0, xPix, p.height);
+          }
         }
 
         for (let pt of points) {
           const px = p.map(pt.x, -1, 1, 0, p.width);
           const py = p.map(pt.y, -1, 1, p.height, 0);
           const predSigned = safePredict([pt.x, pt.y]) === 1 ? 1 : -1;
-          p.fill(pt.labelSigned === 1 ? (darkMode ? "cyan" : "blue") : (darkMode ? "orange" : "red"));
+          p.fill(pt.labelSigned === 1 ? (isDark ? "cyan" : "blue") : (isDark ? "orange" : "red"));
           p.stroke(0);
           p.circle(px, py, 10);
           if (predSigned !== pt.labelSigned) {
@@ -292,10 +618,10 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
         let showEquation = false;
         const mouseXNorm = p.map(p.mouseX, 0, p.width, -1, 1);
         const mouseYNorm = p.map(p.mouseY, p.height, 0, -1, 1);
-        if (classifierType === "linear" && weights.length >= 2 && Math.abs(weights[1]) > 1e-6) {
+        if (classifierType === "linear" && notifiedDone && weights.length >= 2 && Math.abs(weights[1]) > 1e-6) {
           const yOnLine = -(weights[0] * mouseXNorm + bias) / weights[1];
           if (Math.abs(yOnLine - mouseYNorm) < 0.05) showEquation = true;
-        } else if (classifierType === "poly") {
+        } else if (classifierType === "poly" && notifiedDone) {
           if (Math.abs(safePredict([mouseXNorm, mouseYNorm]) - 0.5) < 0.1) showEquation = true;
         }
 
@@ -312,6 +638,7 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
         const mouseXNorm = p.map(p.mouseX, 0, p.width, -1, 1);
         const mouseYNorm = p.map(p.mouseY, p.height, 0, -1, 1);
         if (p.key === " ") {
+          // Only toggle pause/resume; do not mark as finished or show overlays on manual pause
           paused = !paused;
           return;
         }
@@ -338,16 +665,12 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
       p.resetDemo = () => {
         try {
           if (onDatasetChange) onDatasetChange([]);
-        } catch {}
-        if (!onDatasetChange) {
-          reset();
-        } else {
-          points = [];
-          X = [];
-          y = [];
-          model = adaptModel(createRawModel());
-          epoch = indexInEpoch = errorsInEpoch = 0;
+        } catch {
+          // Ignore callback errors
         }
+        // Always fully reset the local demo state to ensure training restarts
+        reset();
+        try { window.dispatchEvent(new CustomEvent('mlv:demo-reset', { detail: { classifier: classifierType } })); } catch {}
       };
     };
 
@@ -385,32 +708,41 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
     }
   }, [speedScale]);
 
+  const handleReset = React.useCallback(() => {
+    try {
+      if (onDatasetChange) onDatasetChange([]);
+    } catch {
+      // Ignore callback errors
+    }
+    if (p5InstanceRef.current) {
+      if (typeof p5InstanceRef.current.resetDemo === "function") {
+        p5InstanceRef.current.resetDemo();
+      } else if (typeof p5InstanceRef.current.updateDataset === "function") {
+        p5InstanceRef.current.updateDataset([]);
+      }
+    }
+  }, [onDatasetChange]);
+
+  const handleMaximizeMargin = React.useCallback(() => {
+    if (p5InstanceRef.current && typeof p5InstanceRef.current.maximizeMargin === "function") {
+      p5InstanceRef.current.maximizeMargin();
+    }
+  }, []);
+
   return (
     <div ref={sketchRef} className={styles.container}>
       <button
+        type="button"
         id="perceptron-reset"
-        onClick={() => {
-          try {
-            if (onDatasetChange) onDatasetChange([]);
-          } catch {}
-          if (p5InstanceRef.current) {
-            if (typeof p5InstanceRef.current.resetDemo === "function") {
-              p5InstanceRef.current.resetDemo();
-            } else if (typeof p5InstanceRef.current.updateDataset === "function") {
-              p5InstanceRef.current.updateDataset([]);
-            }
-          }
-        }}
+        onClick={handleReset}
         className={`${styles.btn} ${styles.btnLeft}`}
       >
         Reset
       </button>
       <button
-        onClick={() => {
-          if (p5InstanceRef.current && typeof p5InstanceRef.current.maximizeMargin === "function") {
-            p5InstanceRef.current.maximizeMargin();
-          }
-        }}
+        type="button"
+        id="perceptron-maximize"
+        onClick={handleMaximizeMargin}
         className={`${styles.btn} ${styles.btnRight}`}
       >
         Maximize margin
@@ -419,6 +751,7 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
         ref={equationRef}
         className={styles.equation}
       />
+      {/* Removed the on-canvas finished banner; App renders equation beneath the canvas */}
     </div>
   );
 };
