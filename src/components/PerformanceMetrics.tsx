@@ -6,7 +6,13 @@ type PerformanceMetricsProps = {
   loss?: number;
   speed?: number;
   trainingTime?: number;
-  theme: any;
+  theme: Theme;
+};
+
+type Theme = {
+  controlBg: string;
+  shadow: string;
+  accent: string;
 };
 
 const PerformanceMetrics: React.FC<PerformanceMetricsProps> = ({

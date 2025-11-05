@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import styles from './AgentPanel.module.css';
+import { chunkText, buildIndex, queryIndex, DocChunk } from '../utils/rag';
 
 interface AgentPanelProps {
   classifier: string;
@@ -15,6 +16,8 @@ interface Message {
   text: string;
   isUser: boolean;
   timestamp: Date;
+  // optional provenance snippets returned by the RAG index
+  sources?: DocChunk[] & { score?: number }[];
 }
 
 const AgentPanel: React.FC<AgentPanelProps> = ({
@@ -34,6 +37,28 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
     },
   ]);
   const [inputValue, setInputValue] = useState('');
+  const indexRef = useRef<any>(null);
+  const [indexReady, setIndexReady] = useState<boolean>(false);
+  const [useRag, setUseRag] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Load a canned assistant context from the public docs folder and build a TF-IDF index
+    const load = async () => {
+      try {
+        const res = await fetch('/docs/assistant_context.md');
+        if (!res.ok) throw new Error('no docs');
+        const md = await res.text();
+        const chunks = chunkText(md, 'assistant_context');
+        indexRef.current = buildIndex(chunks);
+        setIndexReady(true);
+      } catch (e) {
+        // silently ignore; index will remain unavailable
+        indexRef.current = null;
+        setIndexReady(false);
+      }
+    };
+    load();
+  }, []);
 
   const getClassifierInfo = (type: string) => {
     const info: { [key: string]: { description: string; strengths: string[]; weaknesses: string[]; useCases: string[] } } = {
@@ -200,12 +225,34 @@ Ready to explore machine learning!`;
       timestamp: new Date(),
     };
 
+    // Query the TF-IDF index for relevant snippets (if available)
+    let sources: (DocChunk & { score?: number })[] | undefined = undefined;
+    try {
+      if (indexRef.current) {
+        const hits = queryIndex(indexRef.current, inputValue, 3);
+        // attach score where available
+        sources = hits.map((h: any) => ({ ...h }));
+      }
+    } catch {
+      sources = undefined;
+    }
+
     const botResponse: Message = {
       id: messages.length + 2,
       text: generateResponse(inputValue),
       isUser: false,
       timestamp: new Date(),
+      sources,
     };
+    // If RAG toggle is enabled, inject retrieved snippets into the displayed prompt
+    if (useRag && sources && sources.length) {
+      const header = ['Retrieved context (top results):'];
+      for (const s of sources) {
+        header.push(`- ${s.source} (${s.id}) — ${ (s.text || '').slice(0, 180).replace(/\n/g, ' ') }${(s.text || '').length > 180 ? '…' : ''}`);
+      }
+      botResponse.text = `${header.join('\n')}
+\n${botResponse.text}`;
+    }
 
     setMessages(prev => [...prev, userMessage, botResponse]);
     setInputValue('');
@@ -246,6 +293,18 @@ Ready to explore machine learning!`;
                   {message.text.split('\n').map((line, i) => (
                     <div key={i}>{line}</div>
                   ))}
+                  {message.sources && message.sources.length > 0 && (
+                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed rgba(0,0,0,0.08)' }}>
+                      <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Retrieved snippets:</div>
+                      {message.sources.map((s, si) => (
+                        <div key={si} style={{ fontSize: 12, marginBottom: 6 }}>
+                          <div style={{ fontWeight: 600 }}>{s.source} — <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{s.id}</span></div>
+                          <div style={{ opacity: 0.9, marginTop: 4 }}>{s.text.slice(0, 220)}{s.text.length > 220 ? '…' : ''}</div>
+                          <div style={{ fontSize: 11, opacity: 0.6 }}>score: {typeof (s as any).score === 'number' ? (s as any).score.toFixed(3) : '—'}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className={styles.messageTime}>
                   {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -254,6 +313,13 @@ Ready to explore machine learning!`;
             ))}
           </div>
           <div className={styles.inputContainer}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input type="checkbox" checked={useRag} onChange={(e) => setUseRag(e.target.checked)} />
+                <span style={{ fontSize: 12 }}>Include retrieved context</span>
+              </label>
+              <span style={{ fontSize: 11, opacity: 0.7 }}>({indexReady ? 'index ready' : 'index unavailable'})</span>
+            </div>
             <input
               type="text"
               value={inputValue}

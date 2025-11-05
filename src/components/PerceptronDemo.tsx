@@ -25,6 +25,7 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
   const sketchRef = useRef<HTMLDivElement | null>(null);
   const p5InstanceRef = useRef<import("../types/p5").P5Instance | null>(null);
   const equationRef = useRef<HTMLDivElement | null>(null);
+  const finishedRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const fmt = (n: number) => (!isFinite(n) ? "0" : Math.abs(n) < 1e-6 ? 0 : Number(n.toFixed(3)));
@@ -79,6 +80,8 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
   let notifiedDone = false;
   // When finishing, defer heavy background repaints briefly so success animation can appear immediately
   let finishedAtMs = 0;
+  // Track training start time for elapsed duration
+  let startedAtMs: number | null = null;
       const MAX_EPOCHS = 1000;
 
       const createRawModel = () =>
@@ -159,6 +162,8 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
           X.push([vx, vy]);
           y.push(labelSigned === 1 ? 1 : 0);
         }
+        try { startedAtMs = (performance && performance.now) ? performance.now() : Date.now(); } catch { startedAtMs = Date.now(); }
+        try { if (finishedRef.current) finishedRef.current.style.display = 'none'; } catch {}
       };
 
       p.updateDataset = (newDataset: Point[] | undefined) => {
@@ -186,6 +191,8 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
         wasPaused = false;
         try { gridG && gridG.clear(); } catch {}
         try { computeGridSteps(); } catch {}
+        try { startedAtMs = (performance && performance.now) ? performance.now() : Date.now(); } catch { startedAtMs = Date.now(); }
+        try { if (finishedRef.current) finishedRef.current.style.display = 'none'; } catch {}
       };
 
       const safeTrainSample = (sample: any, label: any) => {
@@ -233,6 +240,7 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
         const w = Math.max(300, rect?.width || 600);
         const h = Math.max(300, rect?.height || 600);
         p.createCanvas(w, h);
+        try { p.frameRate?.(45); } catch {}
         try { p.pixelDensity?.(1); } catch {}
         gridG = p.createGraphics(p.width, p.height);
         computeGridSteps();
@@ -247,6 +255,7 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
 
         p.maximizeMargin = (options: any = {}) => {
           try {
+            const mmStart = (performance && performance.now) ? performance.now() : Date.now();
             if (!Array.isArray(X) || X.length === 0) {
               return;
             }
@@ -284,7 +293,15 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
                   accuracy = 1.0 - errorRate;
                 }
               } catch {}
-              try { window.dispatchEvent(new CustomEvent('mlv:demo-finished', { detail: { classifier: classifierType === 'poly' ? 'Polynomial Perceptron' : 'Linear Perceptron', reason: 'max-margin', accuracy } })); } catch {}
+              try {
+                const mmElapsed = ((performance && performance.now) ? performance.now() : Date.now()) - mmStart;
+                const elapsedSec = mmElapsed / 1000;
+                window.dispatchEvent(new CustomEvent('mlv:demo-finished', { detail: { classifier: classifierType === 'poly' ? 'Polynomial Perceptron' : 'Linear Perceptron', reason: 'max-margin', accuracy, elapsedSec } }));
+                if (finishedRef.current) {
+                  finishedRef.current.innerText = `Max margin finished — Time: ${elapsedSec.toFixed(2)}s`;
+                  finishedRef.current.style.display = 'block';
+                }
+              } catch {}
               return;
             }
 
@@ -330,7 +347,15 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
                 }
               } catch {}
               // Notify the app so success animation/toast/equation bar update
-              try { window.dispatchEvent(new CustomEvent('mlv:demo-finished', { detail: { classifier: classifierType === 'poly' ? 'Polynomial Perceptron' : 'Linear Perceptron', reason: 'max-margin', accuracy } })); } catch {}
+              try {
+                const mmElapsed = ((performance && performance.now) ? performance.now() : Date.now()) - mmStart;
+                const elapsedSec = mmElapsed / 1000;
+                window.dispatchEvent(new CustomEvent('mlv:demo-finished', { detail: { classifier: classifierType === 'poly' ? 'Polynomial Perceptron' : 'Linear Perceptron', reason: 'max-margin', accuracy, elapsedSec } }));
+                if (finishedRef.current) {
+                  finishedRef.current.innerText = `Max margin finished — Time: ${elapsedSec.toFixed(2)}s`;
+                  finishedRef.current.style.display = 'block';
+                }
+              } catch {}
             }
           } catch (e) {
             console.error("maximizeMargin error", e);
@@ -346,6 +371,8 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
       };
 
       p.draw = () => {
+        // Skip heavy updates if tab is hidden
+        try { if (typeof document !== 'undefined' && (document as any).hidden) { return; } } catch {}
         if (!paused && X.length && epoch < MAX_EPOCHS) {
           const effectiveSpeed = speed * (p.speedScale || 1); // Training speed
           trainingAccumulator += effectiveSpeed;
@@ -357,12 +384,25 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
             for (let s = 0; s < steps; s++) {
               const xi = X[indexInEpoch],
                 yi = y[indexInEpoch];
-              const predBefore = safePredict(xi);
-              if (predBefore !== yi) {
+              // compute raw score once and reuse to avoid double dot products
+              const score = safePredictRaw(xi);
+              const pred01 = score >= 0 ? 1 : 0;
+              if (pred01 !== yi) {
                 errorsInEpoch++;
                 mistakesThisEpoch++;
               }
-              safeTrainSample(xi, yi);
+              try {
+                const raw = (model as any).raw || model;
+                if (raw && typeof raw.trainSampleScore01 === 'function') {
+                  raw.trainSampleScore01(xi, yi, score);
+                } else if (raw && typeof raw.trainSampleRaw01 === 'function') {
+                  raw.trainSampleRaw01(xi, yi);
+                } else {
+                  safeTrainSample(xi, yi);
+                }
+              } catch {
+                safeTrainSample(xi, yi);
+              }
               indexInEpoch++;
               if (indexInEpoch >= X.length) {
                 epoch++;
@@ -391,6 +431,7 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
                           accuracy = 1.0 - errorRate;
                         }
                       } catch {}
+                      const elapsedSec = (startedAtMs != null) ? (finishedAtMs - startedAtMs) / 1000 : undefined;
                       window.dispatchEvent(
                         new CustomEvent("mlv:demo-finished", {
                           detail: { 
@@ -398,10 +439,18 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
                             reason: "converged", 
                             epoch, 
                             equation: getCurrentEquation(),
-                            accuracy 
+                            accuracy,
+                            elapsedSec
                           },
                         })
                       );
+                      try {
+                        if (finishedRef.current) {
+                          const msg = `Training finished — Time: ${((elapsedSec ?? 0)).toFixed(2)}s`;
+                          finishedRef.current.innerText = msg;
+                          finishedRef.current.style.display = 'block';
+                        }
+                      } catch {}
                     } catch {}
                     // banner removed; App now shows equation under the canvas
                   }
@@ -427,6 +476,7 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
                         accuracy = 1.0 - errorRate;
                       }
                     } catch {}
+                    const elapsedSec = (startedAtMs != null) ? (finishedAtMs - startedAtMs) / 1000 : undefined;
                     window.dispatchEvent(
                       new CustomEvent("mlv:demo-finished", {
                         detail: { 
@@ -434,10 +484,18 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
                           reason: "max-epochs", 
                           epoch, 
                           equation: getCurrentEquation(),
-                          accuracy 
+                          accuracy,
+                          elapsedSec
                         },
                       })
                     );
+                    try {
+                      if (finishedRef.current) {
+                        const msg = `Training finished — Time: ${((elapsedSec ?? 0)).toFixed(2)}s`;
+                        finishedRef.current.innerText = msg;
+                        finishedRef.current.style.display = 'block';
+                      }
+                    } catch {}
                   } catch {}
                   // banner removed; App now shows equation under the canvas
                 }
@@ -671,6 +729,7 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
         // Always fully reset the local demo state to ensure training restarts
         reset();
         try { window.dispatchEvent(new CustomEvent('mlv:demo-reset', { detail: { classifier: classifierType } })); } catch {}
+        try { if (finishedRef.current) finishedRef.current.style.display = 'none'; } catch {}
       };
     };
 
@@ -751,6 +810,27 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
         ref={equationRef}
         className={styles.equation}
       />
+      {/* finished time overlay */}
+      <div
+        ref={finishedRef}
+        style={{
+          position: 'absolute',
+          top: 10,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(0,0,0,0.6)',
+          color: '#fff',
+          padding: '8px 12px',
+          borderRadius: 8,
+          fontSize: 12,
+          letterSpacing: 0.2,
+          display: 'none',
+          zIndex: 1500,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.25)'
+        }}
+      >
+        Training finished
+      </div>
       {/* Removed the on-canvas finished banner; App renders equation beneath the canvas */}
     </div>
   );

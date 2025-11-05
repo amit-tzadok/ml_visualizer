@@ -57,7 +57,11 @@ export default class PolynomialPerceptron {
     return this.model.mseRaw(Xf as number[][], y);
   }
 
-  fitHingeSGD(Xraw: [number, number][], y: Array<number | string>, options: any = {}) {
+  fitHingeSGD(
+    Xraw: [number, number][],
+    y: Array<number | string>,
+    options: { epochs?: number; lr?: number; lambda?: number; shuffle?: boolean } = {}
+  ) {
     if (!Array.isArray(Xraw) || !Array.isArray(y) || Xraw.length !== y.length) return;
     const Xf = Xraw.map((v) => this.transform(v));
     return this.model.fitHingeSGD(Xf as number[][], y, options);

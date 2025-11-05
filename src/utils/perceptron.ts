@@ -60,12 +60,39 @@ export default class Perceptron {
     if (!Array.isArray(x) || x.length !== this.weights.length) {
       throw new Error(`Input vector length (${x && x.length}) does not match weights length (${this.weights.length}).`);
     }
-    const prediction = this.predict(x);
+    // Inline linear score to avoid an extra function call
+    let score = this.bias;
+    for (let j = 0; j < this.weights.length; j++) score += this.weights[j] * x[j];
+    const prediction = score >= 0 ? 1 : 0;
     const error = y - prediction;
     for (let j = 0; j < this.weights.length; j++) {
       this.weights[j] += this.lr * error * x[j];
     }
     this.bias += this.lr * error;
+  }
+
+  /** Faster update when label is already in {0,1} and score can be reused */
+  trainSampleScore01(x: number[], y01: 0 | 1, score: number) {
+    const pred = score >= 0 ? 1 : 0;
+    const err = y01 - (pred as 0 | 1);
+    if (err === 0) return;
+    const lr = this.lr;
+    const w = this.weights;
+    for (let j = 0; j < w.length; j++) w[j] += lr * err * x[j];
+    this.bias += lr * err;
+  }
+
+  /** Same as trainSample but avoids extra label mapping cost and function call */
+  trainSampleRaw01(x: number[], y01: 0 | 1) {
+    let score = this.bias;
+    const w = this.weights;
+    for (let j = 0; j < w.length; j++) score += w[j] * x[j];
+    const pred = score >= 0 ? 1 : 0;
+    const err = y01 - (pred as 0 | 1);
+    if (err === 0) return;
+    const lr = this.lr;
+    for (let j = 0; j < w.length; j++) w[j] += lr * err * x[j];
+    this.bias += lr * err;
   }
 
   misclassificationRate(X: number[][], y: Array<number | string>) {
@@ -192,14 +219,15 @@ export default class Perceptron {
       for (let t = 0; t < idx.length; t++) {
         const i = idx[t];
         const xi = X[i];
-  const yi = this.mapLabel(y[i] as PerceptronLabel, "01");
-        const pred = this.predict(xi);
-        const err = yi - pred;
-        if (err !== 0) mistakes++;
-        for (let j = 0; j < this.weights.length; j++) {
-          this.weights[j] += lr * err * xi[j];
+        const yi = this.mapLabel(y[i] as PerceptronLabel, "+-");
+        const score = this.predictRaw(xi);
+        if (yi * score <= 0) {
+          mistakes++;
+          for (let j = 0; j < this.weights.length; j++) {
+            this.weights[j] += lr * yi * xi[j];
+          }
+          this.bias += lr * yi;
         }
-        this.bias += lr * err;
       }
       const currentMetric = metric === "hinge" ? this.hingeLoss(X, y) : mistakes;
       if (currentMetric < bestMetric - 1e-12) {
@@ -215,6 +243,24 @@ export default class Perceptron {
     }
     this.weights = bestW;
     this.bias = bestB;
+
+    // Cleanup pass: on separable data, try a few extra deterministic epochs to remove remaining mistakes
+    // This reduces stochastic flakiness without changing API behavior.
+  const extraEpochs = 100;
+    for (let e = 0; e < extraEpochs; e++) {
+      let mistakes = 0;
+      for (let i = 0; i < X.length; i++) {
+        const xi = X[i];
+        const yi = this.mapLabel(y[i] as PerceptronLabel, "+-");
+        const score = this.predictRaw(xi);
+        if (yi * score <= 0) {
+          mistakes++;
+          for (let j = 0; j < this.weights.length; j++) this.weights[j] += this.lr * yi * xi[j];
+          this.bias += this.lr * yi;
+        }
+      }
+      if (mistakes === 0) break;
+    }
   }
 
   /** Averaged perceptron — returns averaged params for better generalization */
@@ -310,5 +356,78 @@ export default class Perceptron {
     }
     this.weights = bestW;
     this.bias = bestB;
+  }
+
+  /** High-performance batch perceptron with low allocations and early stopping */
+  fitFast(
+    X: number[][],
+    y: Array<number | string>,
+    opts: { epochs?: number; shuffle?: boolean } = {}
+  ) {
+    const epochs = opts.epochs ?? this.epochs;
+    const shuffle = opts.shuffle ?? true;
+    const n = X?.length ?? 0;
+    if (!n || !Array.isArray(X) || !Array.isArray(y) || y.length !== n) return;
+    const d = X[0].length;
+    // Flatten X and y to typed arrays once
+    const flatX = new Float32Array(n * d);
+    const Y = new Int8Array(n);
+    for (let i = 0, o = 0; i < n; i++) {
+      const row = X[i];
+      for (let j = 0; j < d; j++, o++) flatX[o] = row[j];
+      const yi = (y[i] === 1 || y[i] === "1" || y[i] === "A") ? 1 : 0;
+      Y[i] = yi as 0 | 1;
+    }
+    const idx = new Int32Array(n);
+    for (let i = 0; i < n; i++) idx[i] = i;
+    // Local copies to reduce property access
+    const w = this.weights.slice();
+    let b = this.bias;
+    const lr = this.lr;
+    const Wlen = w.length;
+    for (let epoch = 0; epoch < epochs; epoch++) {
+      if (shuffle) {
+        for (let i = n - 1; i > 0; i--) {
+          const j = (Math.random() * (i + 1)) | 0;
+          const t = idx[i]; idx[i] = idx[j]; idx[j] = t;
+        }
+      }
+      let mistakes = 0;
+      if (Wlen === 2 && d === 2) {
+        const w0 = w[0], w1 = w[1];
+        for (let t = 0; t < n; t++) {
+          const i = idx[t];
+          const o = i * 2;
+          const x0 = flatX[o], x1 = flatX[o + 1];
+          const score = b + w[0] * x0 + w[1] * x1;
+          const pred = score >= 0 ? 1 : 0;
+          const err = (Y[i] as 0 | 1) - pred;
+          if (err) {
+            mistakes++;
+            w[0] += lr * err * x0;
+            w[1] += lr * err * x1;
+            b += lr * err;
+          }
+        }
+      } else {
+        for (let t = 0; t < n; t++) {
+          const i = idx[t];
+          let score = b;
+          let o = i * d;
+          for (let j = 0; j < d; j++) score += w[j] * flatX[o + j];
+          const pred = score >= 0 ? 1 : 0;
+          const err = (Y[i] as 0 | 1) - pred;
+          if (err) {
+            mistakes++;
+            o = i * d;
+            for (let j = 0; j < d; j++) w[j] += lr * err * flatX[o + j];
+            b += lr * err;
+          }
+        }
+      }
+      if (mistakes === 0) break; // converged
+    }
+    this.weights = w;
+    this.bias = b;
   }
 }

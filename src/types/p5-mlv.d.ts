@@ -11,6 +11,6 @@ declare module 'p5' {
 
 // allow importing p5 as default
 declare module 'p5' {
-  const p5: any;
+  const p5: unknown;
   export default p5;
 }

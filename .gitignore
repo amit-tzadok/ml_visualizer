@@ -1,3 +1,65 @@
+# Node & package manager
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+
+# Vite / build output
+dist/
+build/
+
+# Local env files (do NOT commit secrets)
+.env
+.env.*
+.env.local
+.env.*.local
+
+# Runtime / PID / logs
+*.log
+dev-server.pid
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.user
+*.swp
+
+# Coverage / test caches
+coverage/
+.nyc_output/
+.coverage/
+
+# Cache / bundler
+.cache/
+.parcel-cache/
+.turbo/
+.pnp.*
+/.vite/
+
+# Generated or large artifacts
+dist-zip/
+*.tgz
+*.zip
+*.tar.gz
+*.mp4
+
+# System artifacts
+.DS_Store
+Icon?
+
+# Local types or build artifacts that may be generated
+src/**/*.d.ts
+
+# Optional: ignore IDE test folders
+.vscode-test/
+
+# Keep .env.example in the repo, but ignore real env files
+# If you use a secrets manager leave placeholder files only
 # Logs
 logs
 *.log

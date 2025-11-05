@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import p5 from "p5";
-import MLPClassifier from "../utils/mlp";
+import MLPClassifier, { ActivationFunction } from "../utils/mlp";
 import type { P5Instance } from "../types/p5";
+import type { P5Graphics } from "../types";
 
 type Point = { x: number; y: number; label?: string };
 
@@ -18,6 +19,8 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
   const p5Ref = useRef<P5Instance | null>(null);
   const [loss, setLoss] = useState<number | null>(null);
   const finishedRef = useRef<HTMLDivElement | null>(null);
+  // timing overlay for training duration
+  const [lastDurationSec, setLastDurationSec] = useState<number | null>(null);
   // control panel state
   const [optimizer, setOptimizer] = useState<string>("sgd");
   const [activation, setActivation] = useState<string>("sigmoid");
@@ -48,12 +51,14 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
       let X: number[][] = [];
       let y: number[] = [];
       let model: MLPClassifier | null = null;
-  let gridG: any = null;
+  let gridG: P5Graphics | null = null;
   // Only train during an explicit training run
   let isTraining: boolean = false;
   let trainingEpochsRemaining = 0;
   let trainingLR = 0.3;
   let samplesInCurrentEpoch = 0;
+  // Track training start time for elapsed duration
+  let startedAtMs: number | null = null;
   // Adaptive grid step with optional user override via control panel
     let overrideStep: number | null = null;
     let adaptiveStep = gridStepState;
@@ -62,7 +67,7 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
       let gridDirty = true;
 
       const resetModel = (hidden: number[] = [16]) => {
-        model = new MLPClassifier(2, hidden, { lr: lr, optimizer: optimizer, activation: activation as any });
+        model = new MLPClassifier(2, hidden, { lr: lr, optimizer: optimizer, activation: activation as ActivationFunction });
       };
 
       const resetDemo = () => {
@@ -91,9 +96,10 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
       p.setup = () => {
         if (sketchRef.current) sketchRef.current.querySelectorAll("canvas").forEach((c) => c.remove());
         const rect = sketchRef.current?.getBoundingClientRect();
-        p.createCanvas(Math.max(300, rect?.width || 600), Math.max(300, rect?.height || 600));
-        try { (p as any).pixelDensity?.(1); } catch {}
-        gridG = p.createGraphics(p.width, p.height);
+  p.createCanvas(Math.max(300, rect?.width || 600), Math.max(300, rect?.height || 600));
+  p.frameRate?.(45);
+  if (typeof p.pixelDensity === 'function') p.pixelDensity(1);
+  gridG = p.createGraphics ? (p.createGraphics(p.width, p.height) as P5Graphics) : null;
         computeAdaptiveStep();
         gridStep = overrideStep ?? adaptiveStep;
         resetDemo();
@@ -115,8 +121,8 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
                 // choose label: on touch use selected touchClass; otherwise mouse button
                 let label = "A";
                 try {
-                  if ((ev as any).pointerType === "touch") {
-                    label = (p as any)._mlpControls?.touchClass ?? "A";
+                  if ((ev as PointerEvent & { pointerType?: string }).pointerType === "touch") {
+                    label = p._mlpControls?.touchClass ?? "A";
                   } else {
                     label = ev.button === 2 ? "B" : "A";
                   }
@@ -143,7 +149,7 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
         }
         // expose control values on the p5 instance so React controls can update the running sketch
         try {
-          (p as any)._mlpControls = {
+          p._mlpControls = {
             get optimizer() { return optimizer; },
             get activation() { return activation; },
             get lr() { return lr; },
@@ -158,16 +164,18 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
         }
       };
 
-      (p as any).windowResized = () => {
+      (p as unknown as P5Instance).windowResized = () => {
         const rect = sketchRef.current?.getBoundingClientRect();
-        (p as any).resizeCanvas(Math.max(300, rect?.width || 600), Math.max(300, rect?.height || 600));
-        gridG = p.createGraphics(p.width, p.height);
+        p.resizeCanvas?.(Math.max(300, rect?.width || 600), Math.max(300, rect?.height || 600));
+        gridG = p.createGraphics ? (p.createGraphics(p.width, p.height) as P5Graphics) : null;
         computeAdaptiveStep();
         gridStep = overrideStep ?? adaptiveStep;
         gridDirty = true;
       };
 
       p.draw = () => {
+        // Skip heavy updates if tab is hidden to save resources
+  try { if (typeof document !== 'undefined' && (document as Document & { hidden?: boolean }).hidden) { return; } } catch {}
         // Only perform per-frame updates if inside an active training run
         if (isTraining && model && X.length && trainingEpochsRemaining > 0) {
           const steps = Math.max(3, Math.min(10, Math.floor(5 * (p.speedScale || 1))));
@@ -184,7 +192,7 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
               // Calculate and store loss
               try {
                 const L = model.loss(X, y);
-                (p as any)._lastLoss = L;
+                p._lastLoss = L;
               } catch {}
               
               gridDirty = true;
@@ -199,19 +207,26 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
                     accuracy = model.accuracy(X, y);
                   }
                 } catch {}
+                // Compute elapsed time
+                let elapsedSec: number | null = null;
+                try {
+                  const now = (typeof performance !== 'undefined' && typeof performance.now === 'function') ? performance.now() : Date.now();
+                  if (startedAtMs != null) elapsedSec = (now - startedAtMs) / 1000;
+                } catch {}
                 // Notify completion
                 try {
                   window.dispatchEvent(
                     new CustomEvent('mlv:demo-finished', {
-                      detail: { classifier: 'Neural Network (MLP)', reason: 'train-complete', accuracy },
+                      detail: { classifier: 'Neural Network (MLP)', reason: 'train-complete', accuracy, elapsedSec },
                     })
                   );
                 } catch {}
                 // Show finished overlay
                 try {
                   if (finishedRef.current) {
-                    const L = (p as any)._lastLoss;
-                    const msg = typeof L === 'number' ? `Training finished — Loss: ${L.toFixed(4)}` : 'Training finished';
+                    const L = p._lastLoss;
+                    const timeStr = (elapsedSec != null) ? ` • Time: ${elapsedSec.toFixed(2)}s` : '';
+                    const msg = typeof L === 'number' ? `Training finished — Loss: ${L.toFixed(4)}${timeStr}` : `Training finished${timeStr}`;
                     finishedRef.current.innerText = msg;
                     finishedRef.current.style.display = 'block';
                   }
@@ -235,16 +250,19 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
           };
         } catch {}
 
-  if (!gridG) gridG = p.createGraphics(p.width, p.height);
+  if (!gridG) gridG = p.createGraphics ? (p.createGraphics(p.width, p.height) as P5Graphics) : null;
   // ensure current step reflects adaptive or override
   gridStep = overrideStep ?? adaptiveStep;
         if (p.frameCount % gridFreq === 0 || gridDirty) {
           gridDirty = false;
           gridG.clear();
 
-          // Pre-calculate colors to avoid repeated conditionals
-          const redRGBA = isDark ? "rgba(229,62,62,0.25)" : "rgba(229,62,62,0.12)";
-          const blueRGBA = isDark ? "rgba(66,153,225,0.25)" : "rgba(66,153,225,0.12)";
+          // Match Perceptron background palette for decision regions
+          // Perceptron uses:
+          //  - Dark: classA "rgba(80,150,255,0.3)", classB "rgba(255,100,100,0.3)"
+          //  - Light: classA "rgba(200,230,255,0.9)", classB "rgba(255,220,220,0.9)"
+          const blueRGBA = isDark ? "rgba(80,150,255,0.3)" : "rgba(200,230,255,0.9)";
+          const redRGBA = isDark ? "rgba(255,100,100,0.3)" : "rgba(255,220,220,0.9)";
 
           gridG.noStroke();
           for (let gx = 0; gx < p.width; gx += gridStep) {
@@ -252,7 +270,9 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
               const nx = p.map(gx + 0.5 * gridStep, 0, p.width, -1, 1);
               const ny = p.map(gy + 0.5 * gridStep, p.height, 0, -1, 1);
               const pred = model ? (model.forward([nx, ny]) >= 0.5 ? 1 : 0) : 0;
-              gridG.fill(pred === 1 ? redRGBA : blueRGBA);
+              // Keep class mapping consistent with perceptron visuals:
+              // pred === 1 -> class A (blue), pred === 0 -> class B (red)
+              gridG.fill(pred === 1 ? blueRGBA : redRGBA);
               // Ensure full coverage by extending to canvas edge if needed
               const rectWidth = Math.min(gridStep, p.width - gx);
               const rectHeight = Math.min(gridStep, p.height - gy);
@@ -279,9 +299,9 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
         // on touch devices use selected touchClass; p.touches exists when touching
         let label = "A";
         try {
-          const isTouch = (p as any).touches && (p as any).touches.length > 0;
+          const isTouch = p.touches && p.touches.length > 0;
           if (isTouch) {
-            label = (p as any)._mlpControls?.touchClass ?? "A";
+            label = p._mlpControls?.touchClass ?? "A";
           } else {
             label = p.mouseButton === p.LEFT ? "A" : "B";
           }
@@ -322,6 +342,8 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
         trainingLR = opts.lr ?? 0.3;
         samplesInCurrentEpoch = 0;
         isTraining = true;
+    try { startedAtMs = (performance && performance.now) ? performance.now() : Date.now(); } catch { startedAtMs = Date.now(); }
+    setLastDurationSec(null);
         gridDirty = true;
       };
 
@@ -335,6 +357,7 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
         resetDemo();
         if (onDatasetChange) onDatasetChange([]);
         try { if (finishedRef.current) finishedRef.current.style.display = 'none'; } catch {}
+        try { setLastDurationSec(null); } catch {}
       };
     };
 
@@ -361,6 +384,20 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
     };
   }, [externalDataset, onDatasetChange, speedScale]);
 
+  // Pause p5 draw loop when tab is hidden to reduce CPU usage
+  useEffect(() => {
+    const onVis = () => {
+      try {
+        const inst: any = p5Ref.current;
+        if (!inst || typeof inst.noLoop !== 'function' || typeof inst.loop !== 'function') return;
+        if (document.hidden) inst.noLoop(); else inst.loop();
+      } catch {}
+    };
+    document.addEventListener('visibilitychange', onVis);
+    onVis();
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+
   useEffect(() => {
     if (p5Ref.current && typeof p5Ref.current.updateDataset === "function") {
       p5Ref.current.updateDataset(externalDataset || []);
@@ -370,8 +407,8 @@ const MlpDemo: React.FC<MlpDemoProps> = ({ showInstructions = true, speedScale =
   // poll p5 instance for lastLoss set by training callback and update React state
   useEffect(() => {
     const int = setInterval(() => {
-      if (p5Ref.current) {
-        const L = (p5Ref.current as any)._lastLoss;
+        if (p5Ref.current) {
+        const L = p5Ref.current._lastLoss;
         if (typeof L === "number") setLoss(L);
       }
     }, 200);

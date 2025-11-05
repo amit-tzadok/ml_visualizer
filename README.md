@@ -23,19 +23,43 @@ Quick start:
 
 1. Install dependencies:
 
+# ml_visualizer
+
+Interactive visualizations and demos for simple machine learning models (Perceptron, MLP, KNN) built with React + Vite + p5.js.
+
+This repository contains interactive demos used for teaching and experimentation. It includes the visualizers, algorithms, and a small in-app assistant.
+
+Quick start
+
+1. Install dependencies
+
 ```bash
 npm ci
 ```
 
-2. Start the dev server:
+2. Start the dev server
 
 ```bash
 npm run dev
 ```
 
-3. Open the app in the browser and click the "Assistant" button in the header to open the CopilotKit popup. Example questions:
+3. Run tests
 
-- "Where is the MLP implementation?"
-- "How do I increase the MLP learning rate?"
+```bash
+npm run test
+```
 
-See `SUBMISSION.md` and `Screencast.md` for submission checklist and screencast script.
+4. Build for production
+
+```bash
+npm run build
+```
+
+Repository notes
+
+- License: MIT (see `LICENSE`).
+- Tests: Vitest is configured; CI will run tests and build on PRs.
+
+Contributing
+
+See `CONTRIBUTING.md` for contributing guidelines and how to run tests locally.

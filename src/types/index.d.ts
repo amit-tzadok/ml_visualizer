@@ -11,10 +11,10 @@ export type Predicted = {
 // avoid importing the full 'p5' types (they can be incompatible during incremental migration)
 export type P5Graphics = {
   rect: (x: number, y: number, w: number, h: number) => void;
-  fill: (c: any) => void;
+  fill: (c: string | number | number[]) => void;
   noStroke: () => void;
   clear: () => void;
-  getContext?: (type: string) => any;
+  getContext?: (type: string) => CanvasRenderingContext2D | WebGLRenderingContext | null;
   width?: number;
   height?: number;
 };
@@ -27,5 +27,5 @@ export type P5Instance = {
   image?: (g: P5Graphics, x: number, y: number) => void;
   frameCount?: number;
   speedScale?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 };

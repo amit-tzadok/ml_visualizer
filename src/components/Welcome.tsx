@@ -106,7 +106,8 @@ const Welcome: React.FC<WelcomeProps> = ({ onChoose }) => {
           }}
         >
           {cards.map((card, idx) => {
-            const tints: Record<string, any> = {
+            type Tint = { tint1: string; tint2: string; glow: string; border: string };
+            const tints: Record<string, Tint> = {
               linear: {
                 tint1: "rgba(59,130,246,0.22)",
                 tint2: "rgba(59,130,246,0.12)",
@@ -132,7 +133,7 @@ const Welcome: React.FC<WelcomeProps> = ({ onChoose }) => {
                 border: "rgba(6,182,212,0.45)",
               },
             };
-            const c = tints[card.key] || tints.linear;
+            const c: Tint = tints[card.key] || tints.linear;
             return (
               <button
                 key={card.key}

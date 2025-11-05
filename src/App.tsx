@@ -1,18 +1,17 @@
-import React, { useState } from "react";
-import PerceptronDemo from "./components/PerceptronDemo";
-import CompareDemo from "./components/CompareDemo";
-import KnnDemo from "./components/KnnDemo";
-import MlpDemo from "./components/MlpDemo";
-import Welcome from "./components/Welcome";
-import AgentPanel from "./components/AgentPanel";
-import InfoModal from "./components/InfoModal";
-import KeyboardShortcutsModal from "./components/KeyboardShortcutsModal";
+import React, { Suspense, useState } from "react";
+// Lazy-load heavy components to reduce initial bundle and improve responsiveness
+const PerceptronDemo = React.lazy(() => import("./components/PerceptronDemo"));
+const CompareDemo = React.lazy(() => import("./components/CompareDemo"));
+const KnnDemo = React.lazy(() => import("./components/KnnDemo"));
+const MlpDemo = React.lazy(() => import("./components/MlpDemo"));
+const Welcome = React.lazy(() => import("./components/Welcome"));
+const AgentPanel = React.lazy(() => import("./components/AgentPanel"));
+const InfoModal = React.lazy(() => import("./components/InfoModal"));
+const KeyboardShortcutsModal = React.lazy(() => import("./components/KeyboardShortcutsModal"));
 
 // JS components are not typed yet; create any-typed aliases to avoid prop checks
 const CompareAny: any = CompareDemo as any;
 const KnnAny: any = KnnDemo as any;
-// Use the typed MLP demo directly (TSX)
-// Use the typed PerceptronDemo directly
 const WelcomeAny: any = Welcome as any;
 import "./App.css";
 
@@ -440,6 +439,7 @@ const App: React.FC = () => {
             transition: "padding 0.3s ease",
           }}
         >
+          <Suspense fallback={<div style={{ color: currentTheme.text, opacity: 0.7 }}>Loading…</div>}>
           {showWelcome ? (
                 <WelcomeAny
               onChoose={(choice) => {
@@ -522,6 +522,7 @@ const App: React.FC = () => {
               />
             </div>
           )}
+          </Suspense>
         </div>
       </main>
 
@@ -663,30 +664,36 @@ const App: React.FC = () => {
 
   {/* Agent Panel */}
   {!showWelcome && (
-    <AgentPanel
-      classifier={classifier}
-      compare={compare}
-      speedScale={speedScale}
-      theme={currentTheme}
-      isOpen={showAgent}
-      onClose={() => setShowAgent(false)}
-    />
+    <Suspense fallback={null}>
+      <AgentPanel
+        classifier={classifier}
+        compare={compare}
+        speedScale={speedScale}
+        theme={currentTheme}
+        isOpen={showAgent}
+        onClose={() => setShowAgent(false)}
+      />
+    </Suspense>
   )}
 
   {/* Info Modal */}
-  <InfoModal
-    isOpen={showInfoModal}
-    onClose={() => setShowInfoModal(false)}
-    theme={currentTheme}
-  />
+  <Suspense fallback={null}>
+    <InfoModal
+      isOpen={showInfoModal}
+      onClose={() => setShowInfoModal(false)}
+      theme={currentTheme}
+    />
+  </Suspense>
 
   {/* Keyboard Shortcuts Modal */}
-  <KeyboardShortcutsModal
-    isOpen={showKeyboardModal}
-    onClose={() => setShowKeyboardModal(false)}
-    theme={currentTheme}
-    classifier={classifier}
-  />
+  <Suspense fallback={null}>
+    <KeyboardShortcutsModal
+      isOpen={showKeyboardModal}
+      onClose={() => setShowKeyboardModal(false)}
+      theme={currentTheme}
+      classifier={classifier}
+    />
+  </Suspense>
 
   {/* Status badge - hidden for KNN */}
   {!showWelcome && classifier !== 'knn' && (
