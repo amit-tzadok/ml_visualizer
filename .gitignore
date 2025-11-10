@@ -13,6 +13,7 @@ build/
 # Local env files (do NOT commit secrets)
 .env
 .env.*
+!.env.example
 .env.local
 .env.*.local
 
