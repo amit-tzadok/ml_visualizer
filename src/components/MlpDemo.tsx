@@ -538,7 +538,6 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
         } catch (err) {
           if (isDev()) console.debug("mlp: setLastDurationSec error", err);
         }
-        setLastDurationSec(null);
         gridDirty = true;
       };
 
