@@ -1,8 +1,16 @@
-// Vercel-style serverless function (Node.js) to proxy embedding requests to OpenAI
-// Expects process.env.OPENAI_API_KEY to be set in the deployment environment.
+// Serverless embedding proxy (originally written for Vercel).
+// Temporarily disabled by default to avoid outbound calls while Vercel billing is unresolved.
+// To re-enable the proxy set the env var `ENABLE_VERCEL_PROXY=true` and provide `OPENAI_API_KEY`.
 const fetch = require('node-fetch');
 
+const ENABLE_PROXY = process.env.ENABLE_VERCEL_PROXY === 'true';
+
 module.exports = async (req, res) => {
+  if (!ENABLE_PROXY) {
+    res.status(503).json({ error: 'Serverless embedding proxy disabled. Set ENABLE_VERCEL_PROXY=true to enable.' });
+    return;
+  }
+
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;

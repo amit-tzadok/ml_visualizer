@@ -1,0 +1,4 @@
+{
+  "disabled": true,
+  "note": "vercel.json disabled to avoid automatic Vercel deployments while billing is being sorted. Rename or restore this file to re-enable Vercel configuration."
+}
