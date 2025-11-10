@@ -447,7 +447,6 @@ const KNNDemo: React.FC<KnnProps> = ({
     };
   }, [externalDataset, showInstructions]);
 
-  // Removed duplicate effect (it referenced `k` but had incorrect deps)
 
   // keep onDatasetChangeRef in sync with prop changes
   useEffect(() => {
