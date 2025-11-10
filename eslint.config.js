@@ -7,7 +7,19 @@ import tsparser from '@typescript-eslint/parser'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  // files / globs to ignore
+  // Top-level ignores (migrated from .eslintignore)
+  {
+    ignores: [
+      'node_modules/',
+      'dist/',
+      'build/',
+      'public/',
+      '.vite/',
+      'src/components/*.jsx',
+      'scripts/*.js',
+    ],
+  },
+  // files / globs to ignore (legacy helper)
   globalIgnores(['dist', 'src/components/*.jsx', 'scripts/*.js']),
 
   // Default JS/JSX rules (browser / react)

@@ -1,3 +1,4 @@
+/// <reference lib="dom" />
 /* Consolidated p5 types for the project.
    This file augments the 'p5' module with a permissive P5Instance interface
    tailored for demos and also exports the P5Instance type for local imports.
@@ -14,6 +15,30 @@ export interface P5Instance {
   color: (...args: Array<number | string>) => unknown;
   lerpColor?: (c1: unknown, c2: unknown, t: number) => unknown;
   noStroke: () => void;
+  stroke: (...args: Array<number | string>) => void;
+  noFill: () => void;
+  push: () => void;
+  pop: () => void;
+  translate: (...args: Array<number>) => void;
+  rotate: (v: number) => void;
+  line: (...args: Array<number>) => void;
+  ellipse: (...args: Array<number>) => void;
+  text: (...args: Array<number | string>) => void;
+  textSize?: (n: number) => void;
+  textAlign?: (...args: Array<unknown>) => void;
+  CENTER?: number | string;
+  strokeWeight?: (n: number) => void;
+  red?: (c: unknown) => number;
+  green?: (c: unknown) => number;
+  blue?: (c: unknown) => number;
+  clear?: () => void;
+  key?: string;
+  keyPressed?: () => void;
+  noLoop?: () => void;
+  loop?: () => void;
+  // runtime helpers sketches may attach
+  recomputeForK?: (k?: number) => void;
+  requestRedraw?: () => void;
   fill: (...args: Array<number | string>) => void;
   circle: (...args: Array<number | string>) => void;
   rect: (...args: Array<number | string>) => void;
@@ -58,12 +83,15 @@ export interface P5Instance {
     setGridStep?: (v: number) => void;
   };
   _lastLoss?: number;
-  _mlpPointerHandler?: EventListener;
-  _mlpContextHandler?: EventListener;
+  // event handler types use DOM Event signature to avoid lint/no-undef issues
+  _mlpPointerHandler?: (e: Event) => void;
+  _mlpContextHandler?: (e: Event) => void;
 }
 
 declare module "p5" {
-  interface Instance extends P5Instance {}
+  // Replace an empty interface extension with a type alias to satisfy
+  // `@typescript-eslint/no-empty-object-type` while preserving the augmentation.
+  type Instance = P5Instance;
 }
 
 export type { P5Instance as default };
