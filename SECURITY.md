@@ -1,3 +1,9 @@
+# Security
+
+To report a security vulnerability, please open a private issue or contact the repository owner directly. Avoid posting sensitive details publicly.
+
+If you need to contact maintainer by email, add a GitHub issue titled "Security: [short subject]" and mention that you'd like to exchange secure contact details.
+
 # Security Policy
 
 We take security reports seriously. If you discover a vulnerability in this project, please follow the responsible disclosure process below.

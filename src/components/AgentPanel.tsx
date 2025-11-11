@@ -6,10 +6,17 @@ interface AgentPanelProps {
   classifier: string;
   compare: boolean;
   speedScale: number;
-  theme: any;
+  theme: ThemeShape;
   isOpen: boolean;
   onClose: () => void;
 }
+
+type ThemeShape = {
+  controlBg?: string;
+  text?: string;
+  accent?: string;
+  shadow?: string;
+};
 
 interface Message {
   id: number;
@@ -24,7 +31,6 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
   classifier,
   compare,
   speedScale,
-  theme,
   isOpen,
   onClose,
 }) => {
@@ -37,9 +43,18 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
     },
   ]);
   const [inputValue, setInputValue] = useState('');
-  const indexRef = useRef<any>(null);
+  const indexRef = useRef<ReturnType<typeof buildIndex> | null>(null);
   const [indexReady, setIndexReady] = useState<boolean>(false);
   const [useRag, setUseRag] = useState<boolean>(false);
+  // runtime helper to detect dev environment without using `any` casts
+  const isDev = () => {
+    try {
+      const proc = (globalThis as unknown as { process?: { env?: { NODE_ENV?: string } } }).process;
+      return !!(proc && proc.env && proc.env.NODE_ENV !== 'production');
+    } catch {
+      return false;
+    }
+  };
 
   useEffect(() => {
     // Load a canned assistant context from the public docs folder and build a TF-IDF index
@@ -51,10 +66,11 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
         const chunks = chunkText(md, 'assistant_context');
         indexRef.current = buildIndex(chunks);
         setIndexReady(true);
-      } catch (e) {
+      } catch (err) {
         // silently ignore; index will remain unavailable
         indexRef.current = null;
         setIndexReady(false);
+        if (isDev()) console.debug('agentpanel: load index error', err);
       }
     };
     load();
@@ -108,7 +124,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
         return "In Compare mode there are two classifiers at once, so I can’t show a single equation. Turn off Compare to get the current classifier’s equation.";
       }
       try {
-        const status = (window as any).mlvStatus as (undefined | { classifier?: string; equation?: string | null; updatedAt?: number });
+  const status = (window as unknown as { mlvStatus?: { classifier?: string; equation?: string | null; updatedAt?: number } }).mlvStatus;
         if (classifier === 'linear' || classifier === 'poly') {
           if (status && status.classifier === classifier && status.equation) {
             return `Current ${classifier.toUpperCase()} decision boundary:\n${status.equation}`;
@@ -123,8 +139,9 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
         if (classifier === 'knn') {
           return "KNN has no equation—it classifies by the labels of the nearest neighbors in the dataset.";
         }
-      } catch {
+      } catch (err) {
         // fall through to default
+        if (isDev()) console.debug('agentpanel: status probe error', err);
       }
     }
 
@@ -196,7 +213,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
 • Classifier: ${classifier.toUpperCase()}
 • Compare Mode: ${compare ? 'Enabled' : 'Disabled'}
 • Speed: ${speedScale}x
-• Theme: ${theme === 'dark' ? 'Dark' : 'Light'}
+• Theme: (custom)
 
 Ready to explore machine learning!`;
     }
@@ -231,10 +248,11 @@ Ready to explore machine learning!`;
       if (indexRef.current) {
         const hits = queryIndex(indexRef.current, inputValue, 3);
         // attach score where available
-        sources = hits.map((h: any) => ({ ...h }));
+        sources = hits.map((h) => ({ ...(h as (DocChunk & { score?: number })) }));
       }
-    } catch {
+    } catch (err) {
       sources = undefined;
+      if (isDev()) console.debug('agentpanel: queryIndex error', err);
     }
 
     const botResponse: Message = {
@@ -293,14 +311,14 @@ Ready to explore machine learning!`;
                   {message.text.split('\n').map((line, i) => (
                     <div key={i}>{line}</div>
                   ))}
-                  {message.sources && message.sources.length > 0 && (
+            {message.sources && message.sources.length > 0 && (
                     <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed rgba(0,0,0,0.08)' }}>
                       <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Retrieved snippets:</div>
                       {message.sources.map((s, si) => (
                         <div key={si} style={{ fontSize: 12, marginBottom: 6 }}>
                           <div style={{ fontWeight: 600 }}>{s.source} — <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{s.id}</span></div>
                           <div style={{ opacity: 0.9, marginTop: 4 }}>{s.text.slice(0, 220)}{s.text.length > 220 ? '…' : ''}</div>
-                          <div style={{ fontSize: 11, opacity: 0.6 }}>score: {typeof (s as any).score === 'number' ? (s as any).score.toFixed(3) : '—'}</div>
+                          <div style={{ fontSize: 11, opacity: 0.6 }}>score: {typeof (s as DocChunk & { score?: number }).score === 'number' ? ((s as DocChunk & { score?: number }).score as number).toFixed(3) : '—'}</div>
                         </div>
                       ))}
                     </div>

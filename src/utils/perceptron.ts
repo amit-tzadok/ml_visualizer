@@ -394,7 +394,6 @@ export default class Perceptron {
       }
       let mistakes = 0;
       if (Wlen === 2 && d === 2) {
-        const w0 = w[0], w1 = w[1];
         for (let t = 0; t < n; t++) {
           const i = idx[t];
           const o = i * 2;

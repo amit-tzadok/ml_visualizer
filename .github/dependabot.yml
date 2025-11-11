@@ -4,6 +4,16 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
     open-pull-requests-limit: 5
     # Optionally allow automated security-only updates
     allow:

@@ -1,3 +1,46 @@
+# ml_visualizer
+
+Interactive machine-learning visualizations built with React, TypeScript and p5.js.
+
+![Embeddings: disabled](https://img.shields.io/badge/Embeddings-disabled-red)
+
+Note: Embeddings disabled — this repository is intentionally configured to not use external
+embedding APIs (e.g. OpenAI). The client helper and serverless endpoint for embeddings are
+disabled to avoid storing API keys in the repo. If you want to enable embeddings later, see
+the "Enabling embeddings" section below.
+
+This repository contains small demos (KNN, Perceptron, MLP) intended for teaching and experimentation.
+
+Quick start
+
+1. Install dependencies
+
+```bash
+npm install
+```
+
+2. Run a dev server
+
+```bash
+npm run dev
+```
+
+3. Run lint, tests and build
+
+```bash
+npm run lint
+npm test
+npm run build
+```
+
+Contributing
+
+See `CONTRIBUTING.md` for how to open issues and PRs. If you'd like to help, please run the test suite and follow the repository style.
+
+License
+
+This project is licensed under the MIT License — see the `LICENSE` file for details.
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
@@ -63,3 +106,14 @@ Repository notes
 Contributing
 
 See `CONTRIBUTING.md` for contributing guidelines and how to run tests locally.
+
+Enabling embeddings
+
+If you'd like to enable embeddings (not recommended for public repos unless you use a secure secret store):
+
+- Implement or restore a server-side proxy that holds your API key (do not store keys in client code).
+- Set server-side environment variable `OPENAI_API_KEY` in your deployment provider (e.g., Vercel) and, for local dev only, optionally set `VITE_OPENAI_API_KEY` in a local `.env` file.
+- Re-enable the proxy implementation in `api/embeddings.js` and restore the client helper in `src/utils/embeddings.ts`, or set `ENABLE_VERCEL_PROXY=true` if using the previous guarded implementation.
+- Never commit real keys. Keep `.env` ignored and use `.env.example` for placeholders.
+
+If you only want local/demo embeddings without external APIs, consider using the included demo helpers and mock data instead of enabling external keys.

@@ -1,5 +1,23 @@
 # Contributing
 
+Thanks for wanting to contribute! A few simple guidelines to make reviews fast and easy:
+
+- Fork the repository and open a branch for your change.
+- Run `npm install` and make sure `npm run lint` and `npm test` pass.
+- Provide a concise PR title and description explaining the change and why it's useful.
+- Keep changes small and focused. Add tests for new behavior where practical.
+
+Coding standards
+
+- The project uses TypeScript and ESLint. Please run `npm run lint` before sending a PR.
+- Follow existing patterns for p5 sketches (avoid recreating expensive sketches in render loops).
+
+Security
+
+If you discover a security issue, please follow `SECURITY.md` to report it privately.
+
+# Contributing
+
 Thanks for your interest in contributing to ml_visualizer — contributions are very welcome.
 
 Quick guidelines:

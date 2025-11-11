@@ -1,7 +1,0 @@
-# Ignore legacy JSX demo files that are duplicates of TSX versions
-
-src/components/\*.jsx
-
-# Node scripts
-
-scripts/\*.js

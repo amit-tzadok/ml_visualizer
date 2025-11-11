@@ -1,3 +1,5 @@
+/// <reference lib="dom" />
+
 export interface P5Instance {
   // Common p5 instance properties/methods used by our demos (kept permissive)
   createCanvas: (...args: Array<number | string>) => void;
@@ -26,6 +28,20 @@ export interface P5Instance {
   pixelDensity?: (n: number) => void;
   resizeCanvas?: (w: number, h: number) => void;
   touches?: Array<unknown>;
+  stroke: (...args: Array<number | string>) => void;
+  noFill: () => void;
+  push: () => void;
+  pop: () => void;
+  translate: (...args: Array<number>) => void;
+  rotate: (v: number) => void;
+  line: (...args: Array<number>) => void;
+  ellipse: (...args: Array<number>) => void;
+  text: (...args: Array<number | string>) => void;
+  textSize?: (n: number) => void;
+  strokeWeight?: (n: number) => void;
+  red?: (c: unknown) => number;
+  green?: (c: unknown) => number;
+  blue?: (c: unknown) => number;
 
   // our injected helpers
   updateDataset?: (dataset?: Array<{ x: number; y: number; label?: string }>) => void;
@@ -44,6 +60,7 @@ export interface P5Instance {
   };
   _lastLoss?: number;
   // allow attaching arbitrary handlers (pointer/context) for cleanup
-  _mlpPointerHandler?: EventListener;
-  _mlpContextHandler?: EventListener;
+  // use DOM Event signature to keep lint happy
+  _mlpPointerHandler?: (e: Event) => void;
+  _mlpContextHandler?: (e: Event) => void;
 }

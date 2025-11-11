@@ -1,5 +1,11 @@
 # Contributor Covenant Code of Conduct
 
+This project follows the Contributor Covenant. Please be respectful and constructive when interacting in issues and PRs.
+
+For full text, see: https://www.contributor-covenant.org/version/2/1/code_of_conduct/
+
+# Contributor Covenant Code of Conduct
+
 Our Pledge
 
 In the interest of fostering an open and welcoming environment, we as contributors and maintainers pledge to make participation in our project and our community a harassment-free experience for everyone.
