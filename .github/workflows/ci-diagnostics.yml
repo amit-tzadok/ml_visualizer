@@ -47,7 +47,7 @@ jobs:
           npm test -- --runInBand --reporter verbose 2>&1 | tee -a ci-logs/test.log || true
 
       - name: Upload logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ci-diagnostics-logs
           path: ci-logs

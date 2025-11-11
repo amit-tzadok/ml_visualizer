@@ -53,7 +53,7 @@ jobs:
 
       - name: Upload build artifact (optional)
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           # include matrix node version and run id so parallel matrix jobs don't
           # attempt to upload artifacts with the same name (causes 409 conflict)
