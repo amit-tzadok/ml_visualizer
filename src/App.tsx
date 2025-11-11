@@ -282,7 +282,7 @@ const App: React.FC = () => {
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <div style={{ display: "flex", alignItems: "center" }}>
               <img
-                src="/logo.png"
+                src="./logo.png"
                 alt="MLV"
                 style={{ width: 48, height: 48, objectFit: "contain" }}
               />
