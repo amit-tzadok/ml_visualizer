@@ -8,8 +8,15 @@ type Point = { x: number; y: number; label: string };
 type CompareDemoProps = {
   leftType?: string;
   rightType?: string;
-  theme?: any;
+  theme?: ThemeShape;
   speedScale?: number;
+};
+
+type ThemeShape = {
+  controlBg?: string;
+  text?: string;
+  accent?: string;
+  shadow?: string;
 };
 
 const CompareDemo: React.FC<CompareDemoProps> = ({
@@ -31,8 +38,8 @@ const CompareDemo: React.FC<CompareDemoProps> = ({
 
   const [resetToken, setResetToken] = useState<number>(0);
 
-  const onDatasetChange = (updater: any) => {
-    if (typeof updater === "function") setDataset((d) => updater(d));
+  const onDatasetChange = (updater: ((d: Point[]) => Point[]) | Point[]) => {
+    if (typeof updater === "function") setDataset((d) => (updater as (d: Point[]) => Point[])(d));
     else setDataset(updater);
   };
 
@@ -81,14 +88,14 @@ const CompareDemo: React.FC<CompareDemoProps> = ({
   const noiseMap: Record<string, number> = { low: 0.06, medium: 0.12, high: 0.22 };
 
   const renderDemo = (type: string, key: string) => {
-    const commonProps = {
+    const commonProps: Record<string, unknown> = {
       dataset,
       onDatasetChange,
       resetToken,
       showInstructions: false,
       theme,
       speedScale,
-    } as any;
+    };
     if (type === "knn") return <KnnDemo key={key} {...commonProps} />;
     if (type === "mlp") return <MlpDemo key={key} {...commonProps} />;
     return <PerceptronDemo key={key} classifierType={type} {...commonProps} />;

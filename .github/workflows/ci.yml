@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: "Strict CI: lint, typecheck, build & tests"
+    name: "CI: lint, typecheck, build & tests"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
@@ -22,6 +22,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          cache: "npm"
 
       - name: Cache node modules
         uses: actions/cache@v4
@@ -35,20 +36,24 @@ jobs:
         run: npm ci
 
       - name: Lint (ESLint)
-        run: npm run lint
+        run: npm run lint --silent
 
       - name: Type-check (tsc)
         run: npx tsc --noEmit
 
       - name: Build (Vite)
-        run: npm run build
+        run: npm run build --silent
+        env:
+          NODE_OPTIONS: --max_old_space_size=4096
 
-      - name: Run tests (Vitest) with coverage
-        run: npx vitest run --coverage --reporter dot
+      - name: Run tests (Vitest)
+        run: npm test --silent
+        env:
+          CI: true
 
-      - name: Upload coverage artifact
-        if: always() && github.event_name != 'workflow_dispatch'
+      - name: Upload build artifact (optional)
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report-${{ github.run_id }}-${{ matrix.node-version }}
-          path: coverage
+          name: dist
+          path: dist

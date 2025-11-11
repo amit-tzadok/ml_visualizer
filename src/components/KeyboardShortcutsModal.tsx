@@ -1,9 +1,16 @@
 import React from "react";
 
+type ThemeShape = {
+  controlBg?: string;
+  text?: string;
+  accent?: string;
+  shadow?: string;
+};
+
 type KeyboardShortcutsModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  theme: any;
+  theme: ThemeShape;
   classifier: string;
 };
 

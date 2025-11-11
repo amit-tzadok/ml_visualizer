@@ -1297,14 +1297,10 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
     };
   }, [classifierType, externalDataset, onDatasetChange]);
 
-  useEffect(() => {
-    if (
-      p5InstanceRef.current &&
-      typeof p5InstanceRef.current.updateDataset === "function"
-    ) {
-      p5InstanceRef.current.updateDataset(externalDataset || []);
-    }
-  }, [externalDataset]);
+  // NOTE: dataset updates are handled by the reset-token-aware effect below which
+  // listens for both `resetToken` and `externalDataset`. Keeping a single effect
+  // reduces duplicate calls into the drawn p5 instance and avoids unnecessary
+  // re-render/update churn.
 
   useEffect(() => {
     if (

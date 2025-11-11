@@ -1,4 +1,4 @@
-export async function getOpenAIEmbedding(_: string[], __?: string): Promise<number[][]> {
+export async function getOpenAIEmbedding(): Promise<number[][]> {
   // Embeddings support removed by request — this project is configured to not use any
   // third-party embedding APIs or store API keys. If you need embeddings later, re-enable
   // a proxy or provide credentials and restore the implementation.

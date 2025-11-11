@@ -29,3 +29,35 @@ export type P5Instance = {
   speedScale?: number;
   [key: string]: unknown;
 };
+
+// Lightweight adapter interface used by demos to interact with Perceptron-like models
+export interface PerceptronAdapter {
+  raw?: unknown;
+  predict: (sample: number[]) => number;
+  predictRaw: (sample: number[]) => number;
+  trainSample: (sample: number[], label: number) => void;
+  // optional faster training helpers
+  trainSampleScore01?: (sample: number[], label01: 0 | 1, score: number) => void;
+  trainSampleRaw01?: (sample: number[], label01: 0 | 1) => void;
+  // metrics (optional)
+  misclassificationRate?: (X: number[][], y: Array<number | string>) => number;
+  hingeLoss?: (X: number[][], y: Array<number | string>) => number;
+  // fit helpers
+  fit?: (X: number[][], y: Array<number | string>) => void;
+  fitHingeSGD?: (X: number[][], y: Array<number | string>, options?: { epochs?: number; lr?: number; lambda?: number; shuffle?: boolean }) => void;
+  // parameters
+  weights?: number[];
+  bias?: number;
+}
+
+declare global {
+  interface Window {
+    mlvStatus?: {
+      classifier?: string | null;
+      equation?: string | null;
+      weights?: number[] | undefined;
+      bias?: number | undefined;
+      updatedAt?: number;
+    };
+  }
+}

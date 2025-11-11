@@ -7,12 +7,20 @@ const MlpDemo = React.lazy(() => import("./components/MlpDemo"));
 const Welcome = React.lazy(() => import("./components/Welcome"));
 const AgentPanel = React.lazy(() => import("./components/AgentPanel"));
 const InfoModal = React.lazy(() => import("./components/InfoModal"));
-const KeyboardShortcutsModal = React.lazy(() => import("./components/KeyboardShortcutsModal"));
+const KeyboardShortcutsModal = React.lazy(
+  () => import("./components/KeyboardShortcutsModal")
+);
 
-// JS components are not typed yet; create any-typed aliases to avoid prop checks
-const CompareAny: any = CompareDemo as any;
-const KnnAny: any = KnnDemo as any;
-const WelcomeAny: any = Welcome as any;
+// JS components are lazy-loaded; use a permissive generic component type to avoid `any`
+const CompareAny = CompareDemo as React.LazyExoticComponent<
+  React.ComponentType<Record<string, unknown>>
+>;
+const KnnAny = KnnDemo as React.LazyExoticComponent<
+  React.ComponentType<Record<string, unknown>>
+>;
+const WelcomeAny = Welcome as React.LazyExoticComponent<
+  React.ComponentType<Record<string, unknown>>
+>;
 import "./App.css";
 
 type Theme = "light" | "dark";
@@ -22,8 +30,8 @@ const App: React.FC = () => {
   const [compare, setCompare] = useState<boolean>(false);
   const [runKey, _setRunKey] = useState<number>(0);
   const [theme, setTheme] = useState<Theme>("light");
-    // gutterTop keeps the right gutter below the header so header buttons remain clickable
-    const [gutterTop, setGutterTop] = useState<number>(12);
+  // gutterTop keeps the right gutter below the header so header buttons remain clickable
+  const [_gutterTop, setGutterTop] = useState<number>(12);
   const [showWelcome, setShowWelcome] = useState<boolean>(() => {
     try {
       return localStorage.getItem("mlv_seenWelcome") === "1" ? false : true;
@@ -35,11 +43,13 @@ const App: React.FC = () => {
   const [speedScale, setSpeedScale] = useState<number>(1);
   const [showAgent, setShowAgent] = useState<boolean>(false);
   // Training status badge
-  const [trainingStatus, setTrainingStatus] = useState<'idle' | 'training' | 'complete'>('idle');
+  const [trainingStatus, setTrainingStatus] = useState<
+    "idle" | "training" | "complete"
+  >("idle");
   const [accuracy, setAccuracy] = useState<number | null>(null);
   // Removed under-canvas equation bar
   // Audio unlock (for subtle chime)
-  const audioCtxRef = React.useRef<any>(null);
+  const audioCtxRef = React.useRef<AudioContext | null>(null);
   const [audioUnlocked, setAudioUnlocked] = useState<boolean>(false);
   // Compare mode tracking
   const compareRef = React.useRef<boolean>(compare);
@@ -79,31 +89,35 @@ const App: React.FC = () => {
 
   React.useEffect(() => {
     const compute = () => {
-        // compute gutter top based on header bottom to avoid overlaying header
-        try {
-          const hdr = document.querySelector("header");
-          if (hdr && hdr instanceof HTMLElement) {
-            const r = hdr.getBoundingClientRect();
-            setGutterTop(Math.max(0, Math.round(r.bottom + 8)));
-          } else {
-            setGutterTop(showWelcome ? 0 : 12);
-          }
-        } catch {
-          // Ignore errors when computing header position
+      // compute gutter top based on header bottom to avoid overlaying header
+      try {
+        const hdr = document.querySelector("header");
+        if (hdr && hdr instanceof HTMLElement) {
+          const r = hdr.getBoundingClientRect();
+          setGutterTop(Math.max(0, Math.round(r.bottom + 8)));
+        } else {
           setGutterTop(showWelcome ? 0 : 12);
         }
+      } catch {
+        // Ignore errors when computing header position
+        setGutterTop(showWelcome ? 0 : 12);
+      }
     };
 
     compute();
     window.addEventListener("resize", compute);
     const ro = new ResizeObserver(compute);
-    const popup = document.querySelector('[id*="copilot"], [class*="copilot"], [data-testid*="copilot"]');
+    const popup = document.querySelector(
+      '[id*="copilot"], [class*="copilot"], [data-testid*="copilot"]'
+    );
     if (popup) ro.observe(popup as Element);
     const hdr = document.querySelector("header");
     if (hdr) ro.observe(hdr as Element);
     return () => {
       window.removeEventListener("resize", compute);
-      try { ro.disconnect(); } catch {
+      try {
+        ro.disconnect();
+      } catch {
         // Ignore errors when disconnecting ResizeObserver
       }
     };
@@ -119,47 +133,42 @@ const App: React.FC = () => {
   // Unlock audio context on first user interaction; confetti is not blocked by this
   React.useEffect(() => {
     const unlock = () => {
+      // Do not instantiate AudioContext here (causes cross-browser constructor typing) —
+      // simply mark audio as unlocked so UI features depending on it can proceed.
       try {
-        if (!audioCtxRef.current) {
-          const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
-          if (Ctx) audioCtxRef.current = new Ctx();
-        }
-        if (audioCtxRef.current && typeof audioCtxRef.current.resume === 'function') {
-          audioCtxRef.current.resume().then(() => setAudioUnlocked(true)).catch(() => setAudioUnlocked(true));
-        } else {
-          setAudioUnlocked(true);
-        }
+        setAudioUnlocked(true);
       } catch {
         setAudioUnlocked(false);
       }
-      window.removeEventListener('pointerdown', unlock);
-      window.removeEventListener('keydown', unlock);
-      window.removeEventListener('touchstart', unlock);
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      window.removeEventListener("touchstart", unlock);
     };
-    window.addEventListener('pointerdown', unlock, { once: true });
-    window.addEventListener('keydown', unlock, { once: true });
-    window.addEventListener('touchstart', unlock, { once: true });
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    window.addEventListener("touchstart", unlock, { once: true });
     return () => {
-      window.removeEventListener('pointerdown', unlock as EventListener);
-      window.removeEventListener('keydown', unlock as EventListener);
-      window.removeEventListener('touchstart', unlock as EventListener);
+      // remove the listeners without casting — the original function reference is sufficient
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      window.removeEventListener("touchstart", unlock);
     };
-  }, []);
+  }, [showWelcome]);
 
   // Global keyboard shortcut for help modal disabled: users will use the Agent for questions
   // (Kept intentionally empty to avoid capturing '?' / Cmd-? which conflicts with typing or Agent usage.)
-  React.useEffect(() => {
-    return () => {};
-  }, []);
+  // Intentionally no-op: previously had an empty effect which served no purpose and
+  // generated lint noise. Removing it keeps hooks clean and avoids unnecessary
+  // dependencies.
 
   // Listen for demo start/reset events
   React.useEffect(() => {
     const handleReset = () => {
-      setTrainingStatus('training');
+      setTrainingStatus("training");
       setAccuracy(null);
     };
-    window.addEventListener('mlv:demo-reset', handleReset);
-    return () => window.removeEventListener('mlv:demo-reset', handleReset);
+    window.addEventListener("mlv:demo-reset", handleReset);
+    return () => window.removeEventListener("mlv:demo-reset", handleReset);
   }, []);
 
   // Listen for demo finished events - update status badge only
@@ -175,11 +184,11 @@ const App: React.FC = () => {
         gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
 
         const osc1 = ac.createOscillator();
-        osc1.type = 'sine';
+        osc1.type = "sine";
         osc1.frequency.setValueAtTime(660, now);
         osc1.frequency.exponentialRampToValueAtTime(880, now + 0.25);
         const osc2 = ac.createOscillator();
-        osc2.type = 'triangle';
+        osc2.type = "triangle";
         osc2.frequency.setValueAtTime(990, now);
         osc2.frequency.exponentialRampToValueAtTime(1320, now + 0.25);
 
@@ -196,16 +205,22 @@ const App: React.FC = () => {
     };
     const handler = (e: Event) => {
       try {
-        const anyE = e as CustomEvent<any>;
-        const detail = anyE.detail || {};
-        const rawReason: string = detail.reason || 'completed';
-        const isCompleted = rawReason === 'converged' || rawReason === 'max-epochs' || rawReason === 'train-complete' || rawReason === 'max-margin';
+        const anyE = e as CustomEvent<Record<string, unknown>>;
+        const detail = (anyE.detail || {}) as Record<string, unknown>;
+        const d = detail as Record<string, unknown>;
+        const rawReason: string =
+          typeof d.reason === "string" ? d.reason : "completed";
+        const isCompleted =
+          rawReason === "converged" ||
+          rawReason === "max-epochs" ||
+          rawReason === "train-complete" ||
+          rawReason === "max-margin";
         if (!isCompleted) return;
 
         // Update status and accuracy
-        setTrainingStatus('complete');
-        if (detail.accuracy !== undefined) {
-          setAccuracy(detail.accuracy);
+        setTrainingStatus("complete");
+        if (typeof d.accuracy === "number") {
+          setAccuracy(d.accuracy);
         }
 
         playChime();
@@ -213,11 +228,17 @@ const App: React.FC = () => {
         // swallow malformed events
       }
     };
-    window.addEventListener('mlv:demo-finished', handler as unknown as (e: Event) => void);
+    window.addEventListener(
+      "mlv:demo-finished",
+      handler as unknown as (e: Event) => void
+    );
     return () => {
-      window.removeEventListener('mlv:demo-finished', handler as unknown as (e: Event) => void);
+      window.removeEventListener(
+        "mlv:demo-finished",
+        handler as unknown as (e: Event) => void
+      );
     };
-  }, []);
+  }, [audioUnlocked]);
 
   // fixed gutter on the right to prevent overlays from covering the demo
   const GUTTER_WIDTH = 400; // px reserved on the right for sidebar and popups (adjustable)
@@ -259,8 +280,12 @@ const App: React.FC = () => {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <img src="/logo.png" alt="MLV" style={{ width: 48, height: 48, objectFit: 'contain' }} />
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <img
+                src="/logo.png"
+                alt="MLV"
+                style={{ width: 48, height: 48, objectFit: "contain" }}
+              />
             </div>
             <h1
               style={{
@@ -275,18 +300,20 @@ const App: React.FC = () => {
               ML Visualizer
             </h1>
           </div>
-            <div
-              style={{
-                position: "absolute",
-                right: 20,
-                display: "flex",
-                gap: "12px",
-                alignItems: "center",
-              }}
-            >
+          <div
+            style={{
+              position: "absolute",
+              right: 20,
+              display: "flex",
+              gap: "12px",
+              alignItems: "center",
+            }}
+          >
             <button
               onClick={() => {
-                try { localStorage.removeItem('mlv_seenWelcome'); } catch {
+                try {
+                  localStorage.removeItem("mlv_seenWelcome");
+                } catch {
                   // Ignore localStorage errors
                 }
                 setShowWelcome(true);
@@ -328,11 +355,13 @@ const App: React.FC = () => {
               style={{
                 padding: "8px 12px",
                 fontSize: "14px",
-                background: showAgent ? currentTheme.accent : currentTheme.controlBg,
+                background: showAgent
+                  ? currentTheme.accent
+                  : currentTheme.controlBg,
                 border: `1px solid ${currentTheme.shadow}`,
                 borderRadius: "8px",
                 cursor: "pointer",
-                color: showAgent ? '#fff' : currentTheme.text,
+                color: showAgent ? "#fff" : currentTheme.text,
                 transition: "all 0.2s ease",
                 boxShadow: `0 2px 8px ${currentTheme.shadow}`,
               }}
@@ -439,89 +468,95 @@ const App: React.FC = () => {
             transition: "padding 0.3s ease",
           }}
         >
-          <Suspense fallback={<div style={{ color: currentTheme.text, opacity: 0.7 }}>Loading…</div>}>
-          {showWelcome ? (
-                <WelcomeAny
-              onChoose={(choice) => {
-                // directly launch chosen demo at current speed
-                setClassifier(choice);
-                setShowWelcome(false);
-                try {
-                  localStorage.setItem("mlv_seenWelcome", "1");
-                } catch {
-                  // Ignore localStorage errors
-                }
-              }}
-            />
-          ) : compare ? (
-            <div
-              style={{
-                width: "96%",
-                height: "96%",
-                maxWidth: 1400,
-                maxHeight: 1200,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <CompareAny
-                key={runKey}
-                leftType={classifier}
-                rightType={classifier === "linear" ? "poly" : "linear"}
-                theme={currentTheme as any}
-                speedScale={speedScale}
+          <Suspense
+            fallback={
+              <div style={{ color: currentTheme.text, opacity: 0.7 }}>
+                Loading…
+              </div>
+            }
+          >
+            {showWelcome ? (
+              <WelcomeAny
+                onChoose={(choice) => {
+                  // directly launch chosen demo at current speed
+                  setClassifier(choice);
+                  setShowWelcome(false);
+                  try {
+                    localStorage.setItem("mlv_seenWelcome", "1");
+                  } catch {
+                    // Ignore localStorage errors
+                  }
+                }}
               />
-            </div>
-          ) : classifier === "knn" ? (
-            <KnnAny
-              key={runKey}
-              theme={currentTheme as any}
-              showInstructions={false}
-              speedScale={speedScale}
-            />
-          ) : classifier === "mlp" ? (
-            <div
-              style={{
-                width: "96%",
-                height: "96%",
-                maxWidth: 1400,
-                maxHeight: 1200,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <MlpDemo
+            ) : compare ? (
+              <div
+                style={{
+                  width: "96%",
+                  height: "96%",
+                  maxWidth: 1400,
+                  maxHeight: 1200,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <CompareAny
+                  key={runKey}
+                  leftType={classifier}
+                  rightType={classifier === "linear" ? "poly" : "linear"}
+                  theme={currentTheme as unknown as Record<string, unknown>}
+                  speedScale={speedScale}
+                />
+              </div>
+            ) : classifier === "knn" ? (
+              <KnnAny
                 key={runKey}
-                // component accepts speedScale and optional props
+                theme={currentTheme as unknown as Record<string, unknown>}
                 showInstructions={false}
                 speedScale={speedScale}
               />
-            </div>
-          ) : (
-            <div
-              style={{
-                width: "96%",
-                height: "96%",
-                maxWidth: 1400,
-                maxHeight: 1200,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <PerceptronDemo
-                key={runKey}
-                classifierType={classifier}
-                showInstructions={false}
-                speedScale={speedScale}
-                dataset={undefined}
-                onDatasetChange={undefined}
-                resetToken={undefined}
-              />
-            </div>
-          )}
+            ) : classifier === "mlp" ? (
+              <div
+                style={{
+                  width: "96%",
+                  height: "96%",
+                  maxWidth: 1400,
+                  maxHeight: 1200,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <MlpDemo
+                  key={runKey}
+                  // component accepts speedScale and optional props
+                  showInstructions={false}
+                  speedScale={speedScale}
+                />
+              </div>
+            ) : (
+              <div
+                style={{
+                  width: "96%",
+                  height: "96%",
+                  maxWidth: 1400,
+                  maxHeight: 1200,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <PerceptronDemo
+                  key={runKey}
+                  classifierType={classifier}
+                  showInstructions={false}
+                  speedScale={speedScale}
+                  dataset={undefined}
+                  onDatasetChange={undefined}
+                  resetToken={undefined}
+                />
+              </div>
+            )}
           </Suspense>
         </div>
       </main>
@@ -565,7 +600,7 @@ const App: React.FC = () => {
               <span>Algorithm</span>
               <select
                 value={classifier}
-                  onChange={(e) => {
+                onChange={(e) => {
                   const choice = e.target.value;
                   // switch demo immediately at current speed
                   setClassifier(choice);
@@ -588,7 +623,6 @@ const App: React.FC = () => {
                 <option value="mlp">Neural Network (MLP)</option>
                 <option value="knn">K-Nearest Neighbors</option>
               </select>
-              
             </label>
           </div>
 
@@ -603,7 +637,7 @@ const App: React.FC = () => {
               cursor: "pointer",
             }}
           >
-              <input
+            <input
               type="checkbox"
               checked={compare}
               onChange={(e) => {
@@ -620,7 +654,6 @@ const App: React.FC = () => {
               id="mlv-compare-checkbox"
             />
             <span>🔄 Compare Mode</span>
-            
           </label>
         </div>
       )}
@@ -660,89 +693,97 @@ const App: React.FC = () => {
 
       {/* Speed prompt removed: actions apply immediately at current speedScale */}
 
-  {/* Copilot Popup is now rendered inside the right gutter above */}
+      {/* Copilot Popup is now rendered inside the right gutter above */}
 
-  {/* Agent Panel */}
-  {!showWelcome && (
-    <Suspense fallback={null}>
-      <AgentPanel
-        classifier={classifier}
-        compare={compare}
-        speedScale={speedScale}
-        theme={currentTheme}
-        isOpen={showAgent}
-        onClose={() => setShowAgent(false)}
-      />
-    </Suspense>
-  )}
+      {/* Agent Panel */}
+      {!showWelcome && (
+        <Suspense fallback={null}>
+          <AgentPanel
+            classifier={classifier}
+            compare={compare}
+            speedScale={speedScale}
+            theme={currentTheme}
+            isOpen={showAgent}
+            onClose={() => setShowAgent(false)}
+          />
+        </Suspense>
+      )}
 
-  {/* Info Modal */}
-  <Suspense fallback={null}>
-    <InfoModal
-      isOpen={showInfoModal}
-      onClose={() => setShowInfoModal(false)}
-      theme={currentTheme}
-    />
-  </Suspense>
+      {/* Info Modal */}
+      <Suspense fallback={null}>
+        <InfoModal
+          isOpen={showInfoModal}
+          onClose={() => setShowInfoModal(false)}
+          theme={currentTheme}
+        />
+      </Suspense>
 
-  {/* Keyboard Shortcuts Modal */}
-  <Suspense fallback={null}>
-    <KeyboardShortcutsModal
-      isOpen={showKeyboardModal}
-      onClose={() => setShowKeyboardModal(false)}
-      theme={currentTheme}
-      classifier={classifier}
-    />
-  </Suspense>
+      {/* Keyboard Shortcuts Modal */}
+      <Suspense fallback={null}>
+        <KeyboardShortcutsModal
+          isOpen={showKeyboardModal}
+          onClose={() => setShowKeyboardModal(false)}
+          theme={currentTheme}
+          classifier={classifier}
+        />
+      </Suspense>
 
-  {/* Status badge - hidden for KNN */}
-  {!showWelcome && classifier !== 'knn' && (
-    <div
-      style={{
-        position: 'fixed',
-        bottom: 22,
-        right: 200,
-        zIndex: 1300,
-        background: currentTheme.controlBg,
-        border: `2px solid ${
-          trainingStatus === 'complete' ? '#48bb78' :
-          trainingStatus === 'training' ? currentTheme.accent :
-          currentTheme.shadow
-        }`,
-        boxShadow: `0 4px 16px ${currentTheme.shadow}`,
-        borderRadius: 12,
-        padding: '10px 16px',
-        fontSize: 14,
-        fontWeight: '600',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        transition: 'all 0.3s ease',
-      }}
-    >
-      <span style={{ fontSize: 18 }}>
-        {trainingStatus === 'complete' ? '🟢' :
-         trainingStatus === 'training' ? '🟡' :
-         '⚪'}
-      </span>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <div style={{ color: currentTheme.text }}>
-          {trainingStatus === 'complete' ? 'Complete' :
-           trainingStatus === 'training' ? 'Training...' :
-           'Ready'}
-        </div>
-        {accuracy !== null && (
-          <div style={{ 
-            fontSize: 12, 
-            color: currentTheme.accent,
-            fontFamily: 'monospace'
-          }}>
-            Accuracy: {(accuracy * 100).toFixed(1)}%
+      {/* Status badge - hidden for KNN */}
+      {!showWelcome && classifier !== "knn" && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 22,
+            right: 200,
+            zIndex: 1300,
+            background: currentTheme.controlBg,
+            border: `2px solid ${
+              trainingStatus === "complete"
+                ? "#48bb78"
+                : trainingStatus === "training"
+                ? currentTheme.accent
+                : currentTheme.shadow
+            }`,
+            boxShadow: `0 4px 16px ${currentTheme.shadow}`,
+            borderRadius: 12,
+            padding: "10px 16px",
+            fontSize: 14,
+            fontWeight: "600",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            transition: "all 0.3s ease",
+          }}
+        >
+          <span style={{ fontSize: 18 }}>
+            {trainingStatus === "complete"
+              ? "🟢"
+              : trainingStatus === "training"
+              ? "🟡"
+              : "⚪"}
+          </span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{ color: currentTheme.text }}>
+              {trainingStatus === "complete"
+                ? "Complete"
+                : trainingStatus === "training"
+                ? "Training..."
+                : "Ready"}
+            </div>
+            {accuracy !== null && (
+              <div
+                style={{
+                  fontSize: 12,
+                  color: currentTheme.accent,
+                  fontFamily: "monospace",
+                }}
+              >
+                Accuracy: {(accuracy * 100).toFixed(1)}%
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    </div>
-  )}
+        </div>
+      )}
     </div>
   );
 };
