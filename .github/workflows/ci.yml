@@ -55,5 +55,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: dist
+          # include matrix node version and run id so parallel matrix jobs don't
+          # attempt to upload artifacts with the same name (causes 409 conflict)
+          name: dist-${{ matrix.node-version }}-${{ github.run_id }}
           path: dist
