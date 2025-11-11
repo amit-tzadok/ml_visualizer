@@ -282,7 +282,7 @@ const App: React.FC = () => {
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <div style={{ display: "flex", alignItems: "center" }}>
               <img
-                src="./logo.png"
+                src={`${import.meta.env.BASE_URL}logo.png`}
                 alt="MLV"
                 style={{ width: 48, height: 48, objectFit: "contain" }}
               />
@@ -309,30 +309,6 @@ const App: React.FC = () => {
               alignItems: "center",
             }}
           >
-            <button
-              onClick={() => {
-                try {
-                  localStorage.removeItem("mlv_seenWelcome");
-                } catch {
-                  // Ignore localStorage errors
-                }
-                setShowWelcome(true);
-              }}
-              style={{
-                padding: "8px 12px",
-                fontSize: "14px",
-                background: currentTheme.controlBg,
-                border: `1px solid ${currentTheme.shadow}`,
-                borderRadius: "8px",
-                cursor: "pointer",
-                color: currentTheme.text,
-                transition: "all 0.2s ease",
-                boxShadow: `0 2px 8px ${currentTheme.shadow}`,
-              }}
-              title="Show Welcome Screen"
-            >
-              Welcome
-            </button>
             <button
               onClick={() => setFx((v) => !v)}
               style={{
