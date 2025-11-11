@@ -537,132 +537,119 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Floating controls (algorithm + compare) */}
-      {!showWelcome && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 24,
-            left: "50%",
-            transform: "translateX(-50%)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            gap: 16,
-            padding: "16px 24px",
-            background: fx ? currentTheme.controlBg : "rgba(0,0,0,0.02)",
-            borderRadius: 16,
-            boxShadow: fx
-              ? `0 8px 32px ${currentTheme.shadow}`
-              : `0 2px 6px ${currentTheme.shadow}`,
-            backdropFilter: fx ? "blur(20px)" : "none",
-            border: fx ? `1px solid ${currentTheme.shadow}` : "none",
-            zIndex: 1200,
-            transition: "all 0.3s ease",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 14,
-                fontWeight: "500",
-                color: currentTheme.text,
-              }}
-            >
-              <span>🎯</span>
-              <span>Algorithm</span>
-              <select
-                value={classifier}
-                onChange={(e) => {
-                  const choice = e.target.value;
-                  // switch demo immediately at current speed
-                  setClassifier(choice);
-                }}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: "8px",
-                  border: `1px solid ${currentTheme.shadow}`,
-                  background: currentTheme.controlBg,
-                  color: currentTheme.text,
-                  fontSize: "14px",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  boxShadow: `0 2px 8px ${currentTheme.shadow}`,
-                }}
-                id="mlv-algo-select"
-              >
-                <option value="linear">Linear Perceptron</option>
-                <option value="poly">Polynomial Perceptron</option>
-                <option value="mlp">Neural Network (MLP)</option>
-                <option value="knn">K-Nearest Neighbors</option>
-              </select>
-            </label>
-          </div>
-
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              fontSize: 14,
-              fontWeight: "500",
-              color: currentTheme.text,
-              cursor: "pointer",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={compare}
-              onChange={(e) => {
-                const next = e.target.checked;
-                // toggle compare immediately at current speed
-                setCompare(next);
-              }}
-              style={{
-                width: "18px",
-                height: "18px",
-                cursor: "pointer",
-                accentColor: currentTheme.accent,
-              }}
-              id="mlv-compare-checkbox"
-            />
-            <span>🔄 Compare Mode</span>
-          </label>
-        </div>
-      )}
-
-      {/* Separate global speed control (its own panel) */}
+      {/* Unified bottom control bar */}
       {!showWelcome && (
         <div
           style={{
             position: "fixed",
             bottom: 26,
-            left: 90,
-            zIndex: 1200,
-            padding: "12px 16px",
-            borderRadius: 12,
-            background: currentTheme.controlBg,
-            boxShadow: `0 8px 32px ${currentTheme.shadow}`,
+            left: "50%",
+            transform: "translateX(-50%)",
             display: "flex",
             alignItems: "center",
-            gap: 12,
+            gap: 28,
+            padding: "14px 28px",
+            background: fx ? currentTheme.controlBg : "rgba(255,255,255,0.85)",
+            borderRadius: 18,
+            boxShadow: fx
+              ? `0 10px 36px ${currentTheme.shadow}`
+              : `0 4px 14px ${currentTheme.shadow}`,
+            backdropFilter: fx ? "blur(28px)" : "blur(12px)",
+            border: `1px solid ${currentTheme.shadow}`,
+            zIndex: 1250,
+            transition: "all 0.3s ease",
           }}
         >
-          <span style={{ fontSize: 14 }}>⏱️ Speed</span>
-          <input
-            type="range"
-            min="0.25"
-            max="3"
-            step="0.05"
-            value={speedScale}
-            onChange={(e) => setSpeedScale(Number(e.target.value))}
-            style={{ width: 140 }}
-          />
-          <div style={{ width: 48, textAlign: "right" }}>
-            {speedScale.toFixed(2)}x
+          {/* Algorithm selector */}
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              fontSize: 14,
+              fontWeight: 600,
+              color: currentTheme.text,
+            }}
+          >
+            <span style={{ opacity: 0.9 }}>🎯 Algorithm</span>
+            <select
+              value={classifier}
+              onChange={(e) => setClassifier(e.target.value)}
+              style={{
+                padding: "8px 14px",
+                borderRadius: 10,
+                border: `1px solid ${currentTheme.shadow}`,
+                background: currentTheme.controlBg,
+                color: currentTheme.text,
+                fontSize: 14,
+                cursor: "pointer",
+                minWidth: 190,
+                boxShadow: `0 2px 10px ${currentTheme.shadow}`,
+              }}
+              id="mlv-algo-select"
+            >
+              <option value="linear">Linear Perceptron</option>
+              <option value="poly">Polynomial Perceptron</option>
+              <option value="mlp">Neural Network (MLP)</option>
+              <option value="knn">K-Nearest Neighbors</option>
+            </select>
+          </label>
+
+          {/* Compare mode toggle */}
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              fontSize: 14,
+              fontWeight: 600,
+              color: currentTheme.text,
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={compare}
+              onChange={(e) => setCompare(e.target.checked)}
+              style={{
+                width: 18,
+                height: 18,
+                cursor: "pointer",
+                accentColor: currentTheme.accent,
+              }}
+              id="mlv-compare-checkbox"
+            />
+            <span>🔄 Compare</span>
+          </label>
+
+          {/* Speed slider */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              fontSize: 14,
+              fontWeight: 600,
+              color: currentTheme.text,
+              minWidth: 230,
+            }}
+          >
+            <span style={{ opacity: 0.9 }}>⏱️ Speed</span>
+            <input
+              type="range"
+              min="0.25"
+              max="3"
+              step="0.05"
+              value={speedScale}
+              onChange={(e) => setSpeedScale(Number(e.target.value))}
+              style={{ width: 150 }}
+            />
+            <span
+              style={{ width: 56, textAlign: "right", fontFamily: "monospace" }}
+            >
+              {speedScale.toFixed(2)}x
+            </span>
           </div>
         </div>
       )}

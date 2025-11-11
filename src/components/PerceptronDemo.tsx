@@ -953,14 +953,15 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
                 const vx = p.map(px + step / 2, 0, p.width, -1, 1);
                 const vy = p.map(py + step / 2, p.height, 0, -1, 1);
                 const pred = safePredict([vx, vy]);
+                // Subtle translucent fills: A (red), B (blue)
                 gridG.fill(
                   pred === 1
                     ? isDark
-                      ? "rgba(80,150,255,0.3)"
-                      : "rgba(200,230,255,0.9)"
+                      ? "rgba(255,100,100,0.25)"
+                      : "rgba(255,220,220,0.35)"
                     : isDark
-                    ? "rgba(255,100,100,0.3)"
-                    : "rgba(255,220,220,0.9)"
+                    ? "rgba(80,150,255,0.25)"
+                    : "rgba(200,230,255,0.35)"
                 );
                 const rectWidth = Math.min(step, p.width - px);
                 const rectHeight = Math.min(step, p.height - py);
@@ -975,12 +976,13 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
             gridG = p.createGraphics
               ? (p.createGraphics(p.width, p.height) as unknown as P5Graphics)
               : null;
+          // classA (A/red) & classB (B/blue) with subtle translucency
           const classA = isDark
-            ? "rgba(80,150,255,0.3)"
-            : "rgba(200,230,255,0.9)";
+            ? "rgba(255,100,100,0.25)"
+            : "rgba(255,220,220,0.35)";
           const classB = isDark
-            ? "rgba(255,100,100,0.3)"
-            : "rgba(255,220,220,0.9)";
+            ? "rgba(80,150,255,0.25)"
+            : "rgba(200,230,255,0.35)";
           const inGrace = celebrateGrace();
           // Keep coarse fill during grace to avoid a full-width repaint in the finish frame
           const colStep = paused && !inGrace ? 1 : 2; // finer when fully paused, coarse during grace
@@ -1126,7 +1128,9 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
           notifiedDone &&
           weights.length >= 2
         ) {
-          p.stroke(isDark ? 255 : 0, 150, 255);
+          // Neutral boundary stroke for better contrast (avoid purple hue)
+          if (isDark) p.stroke(255, 255, 255, 220);
+          else p.stroke(0, 0, 0, 220);
           const w0 = weights[0];
           const w1 = weights[1];
           if (Math.abs(w1) > 1e-6) {
@@ -1152,15 +1156,8 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
           const px = p.map(pt.x, -1, 1, 0, p.width);
           const py = p.map(pt.y, -1, 1, p.height, 0);
           const predSigned = safePredict([pt.x, pt.y]) === 1 ? 1 : -1;
-          p.fill(
-            pt.labelSigned === 1
-              ? isDark
-                ? "cyan"
-                : "blue"
-              : isDark
-              ? "orange"
-              : "red"
-          );
+          // Use consistent blue/red coloring: A -> red (#e53e3e), B -> blue (#4299e1)
+          p.fill(pt.labelSigned === 1 ? "#e53e3e" : "#4299e1");
           p.stroke(0);
           p.circle(px, py, 10);
           if (predSigned !== pt.labelSigned) {
