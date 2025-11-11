@@ -6,6 +6,9 @@ import react from '@vitejs/plugin-react'
 // from a CDN (see `src/utils/loadP5.ts`). During development we keep `p5` bundled
 // so the dev server continues to work without relying on CDN availability.
 export default defineConfig(({ mode }) => ({
+  // Use relative asset paths for production so the site works on GitHub Pages
+  // where the app is served from /<repo>/ rather than the domain root.
+  base: mode === 'production' ? './' : '/',
   plugins: [react()],
   build: {
     rollupOptions: {
