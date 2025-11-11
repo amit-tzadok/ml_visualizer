@@ -4,6 +4,7 @@ import Perceptron from "../utils/perceptron";
 import PolynomialPerceptron from "../utils/polynomialClassifier";
 import styles from "./PerceptronDemo.module.css";
 import type { P5Instance } from "../types/p5";
+import loadP5 from "../utils/loadP5";
 import type { P5Graphics, PerceptronAdapter } from "../types";
 
 type Point = { x: number; y: number; label?: string };
@@ -1269,7 +1270,7 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
     setLoading(true);
     (async () => {
       try {
-        const mod = await import("p5");
+        const mod = await loadP5();
         if (!mounted) return;
         const P5 = (mod && (mod as any).default) || mod;
         if (p5InstanceRef.current) {

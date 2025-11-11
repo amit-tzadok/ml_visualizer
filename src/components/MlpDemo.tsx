@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 // The MLP sketch exposes a number of control getters/setters on the p5 instance
 // which intentionally read from refs to avoid rebuilding the heavy sketch when UI controls change.
 import MLPClassifier, { ActivationFunction } from "../utils/mlp";
+import loadP5 from "../utils/loadP5";
 import type { P5Instance } from "../types/p5";
 import type { P5Graphics } from "../types";
 
@@ -576,7 +577,7 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
     setLoading(true);
     (async () => {
       try {
-        const mod = await import("p5");
+        const mod = await loadP5();
         if (!mounted) return;
         // `mod` can be either the p5 constructor or a module with a default export.
         // Use a narrow eslint disable for the `any` cast here since it's a runtime import.

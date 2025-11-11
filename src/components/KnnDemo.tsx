@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import { predictKNN } from "../utils/knn";
+import loadP5 from "../utils/loadP5";
 
 import type { Point as TPoint, Predicted } from "../types";
 import type { P5Instance } from "../types/p5";
@@ -417,7 +418,7 @@ const KNNDemo: React.FC<KnnProps> = ({
     setLoading(true);
     (async () => {
       try {
-        const mod = await import("p5");
+        const mod = await loadP5();
         if (!mounted) return;
         // `mod` may be a module namespace with a default export or the constructor itself.
         // Narrow the cast without using `any` to satisfy eslint's no-explicit-any rule.
@@ -446,7 +447,6 @@ const KNNDemo: React.FC<KnnProps> = ({
       }
     };
   }, [externalDataset, showInstructions]);
-
 
   // keep onDatasetChangeRef in sync with prop changes
   useEffect(() => {
