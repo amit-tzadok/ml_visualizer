@@ -91,6 +91,7 @@ export default defineConfig([
   },
 
   // TypeScript files
+  // TypeScript files (single consolidated section)
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
