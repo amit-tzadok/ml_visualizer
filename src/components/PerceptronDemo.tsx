@@ -934,7 +934,10 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
             if (!inGrace) {
               try {
                 gridG.clear();
-              } catch {}
+              } catch (err) {
+                // swallow occasional p5 graphics clear errors (Safari resize race)
+                if (isDev()) console.debug("perceptron: grid clear race", err);
+              }
             }
           }
           if (
@@ -975,8 +978,10 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
                         w[3] * vy * vy +
                         w[4] * vx * vy;
                     }
-                  } catch {
-                    /* ignore manual raw fallback errors */
+                  } catch (err) {
+                    // Ignore manual raw fallback errors; raw stays 0 meaning low confidence
+                    if (isDev())
+                      console.debug("perceptron: raw fallback error", err);
                   }
                 }
                 // Use discrete prediction for color to avoid all-red bug when raw was always >= 0

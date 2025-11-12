@@ -14,7 +14,6 @@ async function bootstrap() {
     // If p5 fails to load in production, we still try to render the app so
     // the rest of the UI (docs, non-demo pages) remains usable. Log to console
     // for easier debugging of the deployed white-screen issue.
-    // eslint-disable-next-line no-console
     console.warn("loadP5 failed:", err);
   }
 

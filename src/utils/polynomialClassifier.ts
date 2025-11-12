@@ -26,23 +26,20 @@ export default class PolynomialPerceptron {
 
   /** Raw (pre-activation) score for a polynomial-transformed input. */
   predictRaw(rawV: [number, number]) {
-    const features = this.transform(rawV);
-    // Underlying perceptron exposes predictRaw; delegate for consistency.
-    if (typeof (this.model as any).predictRaw === "function") {
-      return (this.model as any).predictRaw(features as number[]);
+    const features = this.transform(rawV) as number[];
+    // Delegate directly to underlying perceptron (typed) for raw score.
+    if (typeof this.model.predictRaw === "function") {
+      return this.model.predictRaw(features);
     }
-    // Fallback manual dot product if ever missing.
-    let score = this.biasTerm();
+    // Manual fallback (should rarely occur) — inline dot product.
+    let score = this.model.bias;
     for (let i = 0; i < this.model.weights.length; i++) {
-      score += this.model.weights[i] * (features as number[])[i];
+      score += this.model.weights[i] * features[i];
     }
     return score;
   }
 
-  /** Helper to access current bias for raw-score fallback. */
-  private biasTerm() {
-    return this.model.bias;
-  }
+  // No separate biasTerm helper needed; directly access model.bias.
 
   trainSample(rawV: [number, number], label: number) {
     const features = this.transform(rawV);
