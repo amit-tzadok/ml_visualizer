@@ -11,6 +11,8 @@ export type Predicted = {
 // avoid importing the full 'p5' types (they can be incompatible during incremental migration)
 export type P5Graphics = {
   rect: (x: number, y: number, w: number, h: number) => void;
+  // p5 Graphics buffers expose ellipse just like main instance; mark as present.
+  ellipse: (x: number, y: number, w: number, h: number) => void;
   fill: (c: string | number | number[]) => void;
   noStroke: () => void;
   clear: () => void;
