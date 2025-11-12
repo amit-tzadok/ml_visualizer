@@ -22,6 +22,16 @@ export default defineConfig(({ mode }) => ({
         }
       }
     }
+  },
+  server: {
+    proxy: {
+      // Proxy API requests to a local serverless function simulator
+      // In production, these are handled by Vercel's serverless functions
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      }
+    }
   }
   // Uncomment and modify to use a specific port:
   // server: {

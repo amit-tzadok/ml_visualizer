@@ -46,6 +46,10 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
   const indexRef = useRef<ReturnType<typeof buildIndex> | null>(null);
   const [indexReady, setIndexReady] = useState<boolean>(false);
   const [useRag, setUseRag] = useState<boolean>(false);
+  const [sessionId] = useState<string>(() => {
+    // Generate a unique session ID for this chat session
+    return `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  });
   // runtime helper to detect dev environment without using `any` casts
   const isDev = () => {
     try {
@@ -166,16 +170,16 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
 
     if (input.includes('explain') || input.includes('what is')) {
       if (input.includes('linear') || input.includes('perceptron')) {
-        return "The **Linear Perceptron** is the simplest form of a neural network. It tries to find a straight line that best separates your data points. Think of it as drawing a line to divide red points from blue points. It's great for data that's already somewhat separated, but struggles with complex patterns.";
+        return "The Linear Perceptron is the simplest form of a neural network. It tries to find a straight line that best separates your data points. Think of it as drawing a line to divide red points from blue points. It's great for data that's already somewhat separated, but struggles with complex patterns.";
       }
       if (input.includes('polynomial') || input.includes('poly')) {
-        return "The **Polynomial Perceptron** extends the linear version by adding curved features. Instead of just a straight line, it can create curved decision boundaries. This helps when your data forms curved patterns that a straight line can't separate well.";
+        return "The Polynomial Perceptron extends the linear version by adding curved features. Instead of just a straight line, it can create curved decision boundaries. This helps when your data forms curved patterns that a straight line can't separate well.";
       }
       if (input.includes('mlp') || input.includes('neural') || input.includes('network')) {
-        return "The **Multi-Layer Perceptron (MLP)** is a modern neural network with multiple layers of neurons. It can learn very complex patterns and is the foundation of deep learning. You can adjust the number of hidden layers and neurons to control its complexity.";
+        return "The Multi-Layer Perceptron (MLP) is a modern neural network with multiple layers of neurons. It can learn very complex patterns and is the foundation of deep learning. You can adjust the number of hidden layers and neurons to control its complexity.";
       }
       if (input.includes('knn') || input.includes('nearest')) {
-        return "The **K-Nearest Neighbors (KNN)** algorithm is different - it doesn't 'learn' in the traditional sense. When you want to classify a new point, it looks at the K closest points in your training data and votes on the most common class. It's simple but effective for understanding distance-based classification.";
+        return "The K-Nearest Neighbors (KNN) algorithm is different - it doesn't 'learn' in the traditional sense. When you want to classify a new point, it looks at the K closest points in your training data and votes on the most common class. It's simple but effective for understanding distance-based classification.";
       }
     }
 
@@ -232,6 +236,42 @@ Ready to explore machine learning!`;
 
   };
 
+  /**
+   * Save user question to the database
+   * @param question - The user's question text
+   */
+  const saveQuestionToDB = async (question: string): Promise<void> => {
+    try {
+      const response = await fetch('/api/questions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question,
+          classifier,
+          compareMode: compare,
+          speedScale,
+          sessionId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (isDev()) {
+        console.debug('Question saved:', data);
+      }
+    } catch (error) {
+      // Silently fail - don't disrupt user experience
+      if (isDev()) {
+        console.debug('Failed to save question to database:', error);
+      }
+    }
+  };
+
   const handleSendMessage = () => {
     if (!inputValue.trim()) return;
 
@@ -241,6 +281,11 @@ Ready to explore machine learning!`;
       isUser: true,
       timestamp: new Date(),
     };
+
+    // Save question to database (async, non-blocking)
+    saveQuestionToDB(inputValue).catch((err) => {
+      if (isDev()) console.debug('agentpanel: failed to save question', err);
+    });
 
     // Query the TF-IDF index for relevant snippets (if available)
     let sources: (DocChunk & { score?: number })[] | undefined = undefined;
@@ -311,18 +356,6 @@ Ready to explore machine learning!`;
                   {message.text.split('\n').map((line, i) => (
                     <div key={i}>{line}</div>
                   ))}
-            {message.sources && message.sources.length > 0 && (
-                    <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed rgba(0,0,0,0.08)' }}>
-                      <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Retrieved snippets:</div>
-                      {message.sources.map((s, si) => (
-                        <div key={si} style={{ fontSize: 12, marginBottom: 6 }}>
-                          <div style={{ fontWeight: 600 }}>{s.source} — <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{s.id}</span></div>
-                          <div style={{ opacity: 0.9, marginTop: 4 }}>{s.text.slice(0, 220)}{s.text.length > 220 ? '…' : ''}</div>
-                          <div style={{ fontSize: 11, opacity: 0.6 }}>score: {typeof (s as DocChunk & { score?: number }).score === 'number' ? ((s as DocChunk & { score?: number }).score as number).toFixed(3) : '—'}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
                 <div className={styles.messageTime}>
                   {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

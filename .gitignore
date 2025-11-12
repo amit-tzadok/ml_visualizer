@@ -21,6 +21,11 @@ build/
 *.log
 dev-server.pid
 
+# Database files
+api/*.db
+api/*.db-shm
+api/*.db-wal
+
 # OS / editor files
 .DS_Store
 Thumbs.db
