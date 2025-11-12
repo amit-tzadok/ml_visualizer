@@ -400,7 +400,8 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
         const isDark =
           window.matchMedia &&
           window.matchMedia("(prefers-color-scheme: dark)").matches;
-        p.background(isDark ? 30 : 255);
+        // Darken canvas a bit (light 250 -> 240, dark 48 -> 42) for improved contrast
+        p.background(isDark ? 42 : 240);
 
         // Publish status for AgentPanel (MLP has no simple closed-form equation)
         try {
@@ -427,16 +428,15 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
           gridDirty = false;
           gridG.clear();
 
-          // Match Perceptron background palette for decision regions
-          // Perceptron uses:
-          //  - Dark: classA "rgba(80,150,255,0.3)", classB "rgba(255,100,100,0.3)"
-          //  - Light: classA "rgba(200,230,255,0.9)", classB "rgba(255,220,220,0.9)"
+          // Darker decision region palette (aligned with Perceptron changes)
+          // Dark mode: deeper, lower brightness with moderate opacity
+          // Light mode: move from very pale high-opacity to richer mid-tone with lower opacity
           const blueRGBA = isDark
-            ? "rgba(80,150,255,0.3)"
-            : "rgba(200,230,255,0.9)";
+            ? "rgba(50,110,210,0.38)"
+            : "rgba(120,170,230,0.55)";
           const redRGBA = isDark
-            ? "rgba(255,100,100,0.3)"
-            : "rgba(255,220,220,0.9)";
+            ? "rgba(235,70,70,0.38)"
+            : "rgba(230,120,120,0.55)";
 
           gridG.noStroke();
           for (let gx = 0; gx < p.width; gx += gridStep) {

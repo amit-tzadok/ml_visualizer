@@ -81,7 +81,8 @@ const KNNDemo: React.FC<KnnProps> = ({
         const w = Math.max(300, rect?.width || 600);
         const h = Math.max(300, rect?.height || 600);
         p.createCanvas(w, h);
-        p.background(255);
+        // Darken slightly (250 -> 240) for consistency with updated demo backgrounds
+        p.background(240);
         p.textAlign(p.CENTER, p.CENTER);
         p.textSize(16);
         points = pointsRef.current = [];
@@ -166,7 +167,8 @@ const KNNDemo: React.FC<KnnProps> = ({
       const drawPoints = () => {
         const pts = points || [];
         p.clear();
-        p.background(255);
+        // Darken slightly (250 -> 240) for consistency with updated demo backgrounds
+        p.background(240);
         drawInstructions();
 
         pts.forEach((pt) => {

@@ -86,6 +86,21 @@ const App: React.FC = () => {
   } as const;
 
   const currentTheme = themes[theme];
+  const isDark = theme === "dark";
+  // Bottom panel theming
+  const panelBg = isDark
+    ? "linear-gradient(180deg, rgba(45,55,72,0.92), rgba(45,55,72,0.86))"
+    : "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.90))";
+  const panelBorder = isDark
+    ? "1px solid rgba(255,255,255,0.08)"
+    : "1px solid rgba(0,0,0,0.08)";
+  const panelShadowOuter = isDark
+    ? "0 16px 48px rgba(0,0,0,0.45)"
+    : "0 16px 48px rgba(20,20,20,0.12)";
+  const panelShadowInner = isDark
+    ? "inset 0 1px 0 rgba(255,255,255,0.06)"
+    : "inset 0 1px 0 rgba(255,255,255,0.65)";
+  const dividerColor = isDark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.08)";
 
   React.useEffect(() => {
     const compute = () => {
@@ -279,6 +294,37 @@ const App: React.FC = () => {
             transition: "all 0.3s ease",
           }}
         >
+          {/* Home / Welcome button (top-left corner) */}
+          <div
+            style={{
+              position: "absolute",
+              left: 16,
+              top: 14,
+            }}
+          >
+            <button
+              onClick={() => {
+                setShowWelcome(true);
+                // optionally reset compare and keep speedScale as-is
+                setCompare(false);
+              }}
+              style={{
+                padding: "8px 10px",
+                fontSize: 18,
+                background: currentTheme.controlBg,
+                border: `1px solid ${currentTheme.shadow}`,
+                borderRadius: 10,
+                cursor: "pointer",
+                color: currentTheme.text,
+                transition: "all 0.2s ease",
+                boxShadow: `0 2px 8px ${currentTheme.shadow}`,
+              }}
+              title="Go to Welcome"
+              aria-label="Go to Welcome"
+            >
+              🏠
+            </button>
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <div style={{ display: "flex", alignItems: "center" }}>
               <img
@@ -437,8 +483,11 @@ const App: React.FC = () => {
             position: "relative",
             zIndex: 5,
             boxSizing: "border-box",
-            // reserve space for floating controls
-            paddingBottom: showWelcome ? 0 : 80,
+            // reserve space for floating controls (increased for larger gap below canvas)
+            // Increased spacing below the main demo canvas to create a larger visual gap
+            // between the visualization and the floating bottom control panel.
+            // Was 80 -> 120, now 160.
+            paddingBottom: showWelcome ? 0 : 160,
             paddingRight: showWelcome ? 0 : 40,
             paddingLeft: showWelcome ? 0 : 40,
             transition: "padding 0.3s ease",
@@ -537,25 +586,27 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Unified bottom control bar */}
+      {/* Unified bottom control bar with adjustable vertical offset from canvas */}
       {!showWelcome && (
         <div
           style={{
             position: "fixed",
-            bottom: 26,
+            // Increase bottom offset to introduce padding between demo canvas and control bar
+            // Adjust BOTTOM_BAR_OFFSET to fine-tune spacing: higher value -> more gap
+            bottom: 42, // was 26
             left: "50%",
             transform: "translateX(-50%)",
             display: "flex",
             alignItems: "center",
-            gap: 28,
-            padding: "14px 28px",
-            background: fx ? currentTheme.controlBg : "rgba(255,255,255,0.85)",
-            borderRadius: 18,
+            gap: 54, // internal spacing between groups
+            padding: "20px 48px",
+            background: fx ? panelBg : currentTheme.controlBg,
+            borderRadius: 24,
             boxShadow: fx
-              ? `0 10px 36px ${currentTheme.shadow}`
-              : `0 4px 14px ${currentTheme.shadow}`,
-            backdropFilter: fx ? "blur(28px)" : "blur(12px)",
-            border: `1px solid ${currentTheme.shadow}`,
+              ? `${panelShadowOuter}, ${panelShadowInner}`
+              : `0 8px 22px ${currentTheme.shadow}`,
+            backdropFilter: fx ? "saturate(130%) blur(34px)" : "blur(16px)",
+            border: panelBorder,
             zIndex: 1250,
             transition: "all 0.3s ease",
           }}
@@ -571,21 +622,37 @@ const App: React.FC = () => {
               color: currentTheme.text,
             }}
           >
-            <span style={{ opacity: 0.9 }}>🎯 Algorithm</span>
+            <span aria-hidden style={{ fontSize: 16, lineHeight: 1 }}>
+              🎯
+            </span>
+            <span style={{ opacity: 0.9, whiteSpace: "nowrap" }}>
+              Algorithm
+            </span>
             <select
               value={classifier}
               onChange={(e) => setClassifier(e.target.value)}
               style={{
-                padding: "8px 14px",
+                padding: "10px 16px",
                 borderRadius: 10,
-                border: `1px solid ${currentTheme.shadow}`,
-                background: currentTheme.controlBg,
+                border: panelBorder,
+                background: isDark
+                  ? "linear-gradient(180deg, rgba(55,65,81,0.95), rgba(45,55,72,0.9))"
+                  : "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,247,250,0.96))",
                 color: currentTheme.text,
                 fontSize: 14,
                 cursor: "pointer",
                 minWidth: 190,
-                boxShadow: `0 2px 10px ${currentTheme.shadow}`,
+                boxShadow: `${panelShadowInner}, 0 2px 10px ${currentTheme.shadow}`,
+                outline: "none",
               }}
+              onFocus={(e) =>
+                (e.currentTarget.style.boxShadow = `0 0 0 3px ${
+                  isDark ? "rgba(99,179,237,0.35)" : "rgba(102,126,234,0.35)"
+                }, ${panelShadowInner}`)
+              }
+              onBlur={(e) =>
+                (e.currentTarget.style.boxShadow = `${panelShadowInner}, 0 2px 10px ${currentTheme.shadow}`)
+              }
               id="mlv-algo-select"
             >
               <option value="linear">Linear Perceptron</option>
@@ -594,6 +661,18 @@ const App: React.FC = () => {
               <option value="knn">K-Nearest Neighbors</option>
             </select>
           </label>
+
+          {/* divider */}
+          <div
+            aria-hidden
+            style={{
+              width: 1,
+              height: 32,
+              background: dividerColor,
+              opacity: 1,
+              borderRadius: 1,
+            }}
+          />
 
           {/* Compare mode toggle */}
           <label
@@ -608,6 +687,10 @@ const App: React.FC = () => {
               userSelect: "none",
             }}
           >
+            <span aria-hidden style={{ fontSize: 16, lineHeight: 1 }}>
+              🔄
+            </span>
+            <span style={{ whiteSpace: "nowrap" }}>Compare</span>
             <input
               type="checkbox"
               checked={compare}
@@ -620,8 +703,19 @@ const App: React.FC = () => {
               }}
               id="mlv-compare-checkbox"
             />
-            <span>🔄 Compare</span>
           </label>
+
+          {/* divider */}
+          <div
+            aria-hidden
+            style={{
+              width: 1,
+              height: 32,
+              background: dividerColor,
+              opacity: 1,
+              borderRadius: 1,
+            }}
+          />
 
           {/* Speed slider */}
           <div
@@ -635,7 +729,10 @@ const App: React.FC = () => {
               minWidth: 230,
             }}
           >
-            <span style={{ opacity: 0.9 }}>⏱️ Speed</span>
+            <span aria-hidden style={{ fontSize: 16, lineHeight: 1 }}>
+              ⏱️
+            </span>
+            <span style={{ opacity: 0.9, whiteSpace: "nowrap" }}>Speed</span>
             <input
               type="range"
               min="0.25"
@@ -643,7 +740,16 @@ const App: React.FC = () => {
               step="0.05"
               value={speedScale}
               onChange={(e) => setSpeedScale(Number(e.target.value))}
-              style={{ width: 150 }}
+              style={{
+                width: 180,
+                WebkitAppearance: "none",
+                height: 6,
+                borderRadius: 999,
+                background: isDark
+                  ? "linear-gradient(90deg, rgba(102,126,234,0.5), rgba(118,75,162,0.4))"
+                  : "linear-gradient(90deg, rgba(255,0,128,0.35), rgba(102,126,234,0.25))",
+                outline: "none",
+              }}
             />
             <span
               style={{ width: 56, textAlign: "right", fontFamily: "monospace" }}
@@ -651,6 +757,56 @@ const App: React.FC = () => {
               {speedScale.toFixed(2)}x
             </span>
           </div>
+
+          {/* Training status (moved from separate floating badge) */}
+          {classifier !== "knn" && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                padding: "12px 22px",
+                background: isDark
+                  ? "linear-gradient(180deg, rgba(45,55,72,0.92), rgba(45,55,72,0.86))"
+                  : "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,247,250,0.96))",
+                border: panelBorder,
+                borderRadius: 18,
+                boxShadow: `${panelShadowInner}, 0 8px 24px ${currentTheme.shadow}`,
+                fontSize: 14,
+                fontWeight: 600,
+                color: currentTheme.text,
+                minWidth: 180,
+              }}
+            >
+              <span style={{ fontSize: 18 }}>
+                {trainingStatus === "complete"
+                  ? "🟢"
+                  : trainingStatus === "training"
+                  ? "🟡"
+                  : "⚪"}
+              </span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <div>
+                  {trainingStatus === "complete"
+                    ? "Complete"
+                    : trainingStatus === "training"
+                    ? "Training..."
+                    : "Ready"}
+                </div>
+                {accuracy !== null && (
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: currentTheme.accent,
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    {(accuracy * 100).toFixed(1)}% acc
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -691,62 +847,7 @@ const App: React.FC = () => {
         />
       </Suspense>
 
-      {/* Status badge - hidden for KNN */}
-      {!showWelcome && classifier !== "knn" && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 22,
-            right: 200,
-            zIndex: 1300,
-            background: currentTheme.controlBg,
-            border: `2px solid ${
-              trainingStatus === "complete"
-                ? "#48bb78"
-                : trainingStatus === "training"
-                ? currentTheme.accent
-                : currentTheme.shadow
-            }`,
-            boxShadow: `0 4px 16px ${currentTheme.shadow}`,
-            borderRadius: 12,
-            padding: "10px 16px",
-            fontSize: 14,
-            fontWeight: "600",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            transition: "all 0.3s ease",
-          }}
-        >
-          <span style={{ fontSize: 18 }}>
-            {trainingStatus === "complete"
-              ? "🟢"
-              : trainingStatus === "training"
-              ? "🟡"
-              : "⚪"}
-          </span>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <div style={{ color: currentTheme.text }}>
-              {trainingStatus === "complete"
-                ? "Complete"
-                : trainingStatus === "training"
-                ? "Training..."
-                : "Ready"}
-            </div>
-            {accuracy !== null && (
-              <div
-                style={{
-                  fontSize: 12,
-                  color: currentTheme.accent,
-                  fontFamily: "monospace",
-                }}
-              >
-                Accuracy: {(accuracy * 100).toFixed(1)}%
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Status badge removed; integrated into bottom control bar */}
     </div>
   );
 };
