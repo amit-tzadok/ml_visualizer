@@ -14,21 +14,22 @@
 }
 .btn {
   position: absolute;
-  top: 12px;
+  top: 8px;
   z-index: 1400;
-  padding: 6px 10px;
-  border-radius: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
   background: var(--mlv-card);
   border: 1px solid var(--mlv-border);
   backdrop-filter: blur(var(--mlv-blur));
   cursor: pointer;
   pointer-events: auto !important;
+  font-size: 12px;
 }
 .btnRight {
-  right: 12px;
+  right: 8px;
 }
 .btnLeft {
-  left: 12px;
+  left: 8px;
 }
 .equation {
   position: absolute;
@@ -36,12 +37,12 @@
   left: 50%;
   transform: translate(-50%, -50%);
   background: rgba(255,255,255,0.85);
-  padding: 6px 12px;
-  border-radius: 10px;
+  padding: 5px 10px;
+  border-radius: 8px;
   font-family: monospace;
-  font-size: 16px;
+  font-size: 13px;
   z-index: 100;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.15);
   opacity: 0;
   transition: opacity 0.3s ease;
   pointer-events: none;

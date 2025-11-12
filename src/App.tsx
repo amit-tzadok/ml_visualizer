@@ -281,7 +281,7 @@ const App: React.FC = () => {
             top: 0,
             left: 0,
             right: 0,
-            height: 70,
+            height: 52,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -289,7 +289,7 @@ const App: React.FC = () => {
             backdropFilter: "blur(20px)",
             color: currentTheme.text,
             zIndex: 1100,
-            boxShadow: `0 4px 20px ${currentTheme.shadow}`,
+            boxShadow: `0 2px 12px ${currentTheme.shadow}`,
             borderBottom: `1px solid ${currentTheme.shadow}`,
             transition: "all 0.3s ease",
           }}
@@ -298,8 +298,8 @@ const App: React.FC = () => {
           <div
             style={{
               position: "absolute",
-              left: 16,
-              top: 14,
+              left: 12,
+              top: 10,
             }}
           >
             <button
@@ -309,15 +309,15 @@ const App: React.FC = () => {
                 setCompare(false);
               }}
               style={{
-                padding: "8px 10px",
-                fontSize: 18,
+                padding: "6px 8px",
+                fontSize: 16,
                 background: currentTheme.controlBg,
                 border: `1px solid ${currentTheme.shadow}`,
-                borderRadius: 10,
+                borderRadius: 8,
                 cursor: "pointer",
                 color: currentTheme.text,
                 transition: "all 0.2s ease",
-                boxShadow: `0 2px 8px ${currentTheme.shadow}`,
+                boxShadow: `0 1px 4px ${currentTheme.shadow}`,
               }}
               title="Go to Welcome"
               aria-label="Go to Welcome"
@@ -325,18 +325,18 @@ const App: React.FC = () => {
               🏠
             </button>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <div style={{ display: "flex", alignItems: "center" }}>
               <img
                 src={`${import.meta.env.BASE_URL}logo.png`}
                 alt="MLV"
-                style={{ width: 48, height: 48, objectFit: "contain" }}
+                style={{ width: 36, height: 36, objectFit: "contain" }}
               />
             </div>
             <h1
               style={{
                 margin: 0,
-                fontSize: 32,
+                fontSize: 24,
                 fontWeight: "700",
                 color: currentTheme.text,
                 letterSpacing: "-0.5px",
@@ -349,43 +349,26 @@ const App: React.FC = () => {
           <div
             style={{
               position: "absolute",
-              right: 20,
+              right: 12,
               display: "flex",
-              gap: "12px",
+              gap: "8px",
               alignItems: "center",
             }}
           >
             <button
-              onClick={() => setFx((v) => !v)}
-              style={{
-                padding: "8px 12px",
-                fontSize: "14px",
-                background: currentTheme.controlBg,
-                border: `1px solid ${currentTheme.shadow}`,
-                borderRadius: "8px",
-                cursor: "pointer",
-                color: currentTheme.text,
-                transition: "all 0.2s ease",
-                boxShadow: `0 2px 8px ${currentTheme.shadow}`,
-              }}
-              title="Toggle background visual effects"
-            >
-              {fx ? "✨ FX On" : "⚡ FX Off"}
-            </button>
-            <button
               onClick={() => setShowAgent((v) => !v)}
               style={{
-                padding: "8px 12px",
-                fontSize: "14px",
+                padding: "6px 10px",
+                fontSize: "13px",
                 background: showAgent
                   ? currentTheme.accent
                   : currentTheme.controlBg,
                 border: `1px solid ${currentTheme.shadow}`,
-                borderRadius: "8px",
+                borderRadius: "6px",
                 cursor: "pointer",
                 color: showAgent ? "#fff" : currentTheme.text,
                 transition: "all 0.2s ease",
-                boxShadow: `0 2px 8px ${currentTheme.shadow}`,
+                boxShadow: `0 1px 4px ${currentTheme.shadow}`,
               }}
               title="Toggle ML Assistant"
             >
@@ -394,15 +377,15 @@ const App: React.FC = () => {
             <button
               onClick={() => setShowInfoModal(true)}
               style={{
-                padding: "8px 12px",
-                fontSize: "14px",
+                padding: "6px 10px",
+                fontSize: "13px",
                 background: currentTheme.controlBg,
                 border: `1px solid ${currentTheme.shadow}`,
-                borderRadius: "8px",
+                borderRadius: "6px",
                 cursor: "pointer",
                 color: currentTheme.text,
                 transition: "all 0.2s ease",
-                boxShadow: `0 2px 8px ${currentTheme.shadow}`,
+                boxShadow: `0 1px 4px ${currentTheme.shadow}`,
               }}
               title="About & Info"
             >
@@ -411,15 +394,15 @@ const App: React.FC = () => {
             <button
               onClick={() => setShowKeyboardModal(true)}
               style={{
-                padding: "8px 12px",
-                fontSize: "14px",
+                padding: "6px 10px",
+                fontSize: "13px",
                 background: currentTheme.controlBg,
                 border: `1px solid ${currentTheme.shadow}`,
-                borderRadius: "8px",
+                borderRadius: "6px",
                 cursor: "pointer",
                 color: currentTheme.text,
                 transition: "all 0.2s ease",
-                boxShadow: `0 2px 8px ${currentTheme.shadow}`,
+                boxShadow: `0 1px 4px ${currentTheme.shadow}`,
               }}
               title="Keyboard Shortcuts"
             >
@@ -428,15 +411,15 @@ const App: React.FC = () => {
             <button
               onClick={() => setTheme(theme === "light" ? "dark" : "light")}
               style={{
-                padding: "8px 12px",
-                fontSize: "14px",
+                padding: "6px 10px",
+                fontSize: "13px",
                 background: currentTheme.controlBg,
                 border: `1px solid ${currentTheme.shadow}`,
-                borderRadius: "8px",
+                borderRadius: "6px",
                 cursor: "pointer",
                 color: currentTheme.text,
                 transition: "all 0.2s ease",
-                boxShadow: `0 2px 8px ${currentTheme.shadow}`,
+                boxShadow: `0 1px 4px ${currentTheme.shadow}`,
               }}
             >
               {theme === "light" ? "🌙" : "☀️"}
@@ -449,7 +432,7 @@ const App: React.FC = () => {
       <main
         style={{
           position: "absolute",
-          top: showWelcome ? 0 : 70,
+          top: showWelcome ? 0 : 52,
           bottom: 0,
           left: 0,
           right: 0,
@@ -485,9 +468,9 @@ const App: React.FC = () => {
             boxSizing: "border-box",
             // reserve space for floating controls; compact panel requires less padding
             // Was 160, reduce to 104 for a tighter layout while keeping clear separation
-            paddingBottom: showWelcome ? 0 : 104,
-            paddingRight: showWelcome ? 0 : 28,
-            paddingLeft: showWelcome ? 0 : 28,
+            paddingBottom: showWelcome ? 0 : 76,
+            paddingRight: showWelcome ? 0 : 20,
+            paddingLeft: showWelcome ? 0 : 20,
             transition: "padding 0.3s ease",
           }}
         >
@@ -512,25 +495,13 @@ const App: React.FC = () => {
                 }}
               />
             ) : compare ? (
-              <div
-                style={{
-                  width: "96%",
-                  height: "96%",
-                  maxWidth: 1400,
-                  maxHeight: 1200,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <CompareAny
-                  key={runKey}
-                  leftType={classifier}
-                  rightType={classifier === "linear" ? "poly" : "linear"}
-                  theme={currentTheme as unknown as Record<string, unknown>}
-                  speedScale={speedScale}
-                />
-              </div>
+              <CompareAny
+                key={runKey}
+                leftType={classifier}
+                rightType={classifier === "linear" ? "poly" : "linear"}
+                theme={currentTheme as unknown as Record<string, unknown>}
+                speedScale={speedScale}
+              />
             ) : classifier === "knn" ? (
               <KnnAny
                 key={runKey}
@@ -590,18 +561,18 @@ const App: React.FC = () => {
           style={{
             position: "fixed",
             // Compact panel with a slightly smaller stand-off from the bottom
-            bottom: 30, // was 42
+            bottom: 16,
             left: "50%",
             transform: "translateX(-50%)",
             display: "flex",
             alignItems: "center",
-            gap: 24, // was 54
-            padding: "10px 18px", // was 20px 48px
+            gap: 16,
+            padding: "8px 14px",
             background: fx ? panelBg : currentTheme.controlBg,
-            borderRadius: 14, // was 24
+            borderRadius: 10,
             boxShadow: fx
               ? `${panelShadowOuter}, ${panelShadowInner}`
-              : `0 6px 16px ${currentTheme.shadow}`,
+              : `0 4px 12px ${currentTheme.shadow}`,
             backdropFilter: fx ? "saturate(120%) blur(22px)" : "blur(12px)",
             border: panelBorder,
             zIndex: 1250,
@@ -613,13 +584,13 @@ const App: React.FC = () => {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              fontSize: 13,
+              gap: 6,
+              fontSize: 12,
               fontWeight: 600,
               color: currentTheme.text,
             }}
           >
-            <span aria-hidden style={{ fontSize: 16, lineHeight: 1 }}>
+            <span aria-hidden style={{ fontSize: 14, lineHeight: 1 }}>
               🎯
             </span>
             <span style={{ opacity: 0.9, whiteSpace: "nowrap" }}>
@@ -629,26 +600,26 @@ const App: React.FC = () => {
               value={classifier}
               onChange={(e) => setClassifier(e.target.value)}
               style={{
-                padding: "8px 12px",
-                borderRadius: 8,
+                padding: "6px 10px",
+                borderRadius: 6,
                 border: panelBorder,
                 background: isDark
                   ? "linear-gradient(180deg, rgba(55,65,81,0.95), rgba(45,55,72,0.9))"
                   : "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,247,250,0.96))",
                 color: currentTheme.text,
-                fontSize: 13,
+                fontSize: 12,
                 cursor: "pointer",
-                minWidth: 160,
-                boxShadow: `${panelShadowInner}, 0 1px 8px ${currentTheme.shadow}`,
+                minWidth: 140,
+                boxShadow: `${panelShadowInner}, 0 1px 6px ${currentTheme.shadow}`,
                 outline: "none",
               }}
               onFocus={(e) =>
-                (e.currentTarget.style.boxShadow = `0 0 0 3px ${
+                (e.currentTarget.style.boxShadow = `0 0 0 2px ${
                   isDark ? "rgba(99,179,237,0.35)" : "rgba(102,126,234,0.35)"
                 }, ${panelShadowInner}`)
               }
               onBlur={(e) =>
-                (e.currentTarget.style.boxShadow = `${panelShadowInner}, 0 2px 10px ${currentTheme.shadow}`)
+                (e.currentTarget.style.boxShadow = `${panelShadowInner}, 0 1px 6px ${currentTheme.shadow}`)
               }
               id="mlv-algo-select"
             >
@@ -664,7 +635,7 @@ const App: React.FC = () => {
             aria-hidden
             style={{
               width: 1,
-              height: 24,
+              height: 20,
               background: dividerColor,
               opacity: 1,
               borderRadius: 1,
@@ -676,15 +647,15 @@ const App: React.FC = () => {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              fontSize: 13,
+              gap: 6,
+              fontSize: 12,
               fontWeight: 600,
               color: currentTheme.text,
               cursor: "pointer",
               userSelect: "none",
             }}
           >
-            <span aria-hidden style={{ fontSize: 16, lineHeight: 1 }}>
+            <span aria-hidden style={{ fontSize: 14, lineHeight: 1 }}>
               🔄
             </span>
             <span style={{ whiteSpace: "nowrap" }}>Compare</span>
@@ -693,8 +664,8 @@ const App: React.FC = () => {
               checked={compare}
               onChange={(e) => setCompare(e.target.checked)}
               style={{
-                width: 16,
-                height: 16,
+                width: 14,
+                height: 14,
                 cursor: "pointer",
                 accentColor: currentTheme.accent,
               }}
@@ -707,7 +678,7 @@ const App: React.FC = () => {
             aria-hidden
             style={{
               width: 1,
-              height: 24,
+              height: 20,
               background: dividerColor,
               opacity: 1,
               borderRadius: 1,
@@ -719,14 +690,14 @@ const App: React.FC = () => {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              fontSize: 13,
+              gap: 8,
+              fontSize: 12,
               fontWeight: 600,
               color: currentTheme.text,
-              minWidth: 200,
+              minWidth: 170,
             }}
           >
-            <span aria-hidden style={{ fontSize: 16, lineHeight: 1 }}>
+            <span aria-hidden style={{ fontSize: 14, lineHeight: 1 }}>
               ⏱️
             </span>
             <span style={{ opacity: 0.9, whiteSpace: "nowrap" }}>Speed</span>
@@ -738,9 +709,9 @@ const App: React.FC = () => {
               value={speedScale}
               onChange={(e) => setSpeedScale(Number(e.target.value))}
               style={{
-                width: 140,
+                width: 120,
                 WebkitAppearance: "none",
-                height: 5,
+                height: 4,
                 borderRadius: 999,
                 background: isDark
                   ? "linear-gradient(90deg, rgba(102,126,234,0.5), rgba(118,75,162,0.4))"
@@ -750,10 +721,10 @@ const App: React.FC = () => {
             />
             <span
               style={{
-                width: 48,
+                width: 42,
                 textAlign: "right",
                 fontFamily: "monospace",
-                fontSize: 12,
+                fontSize: 11,
               }}
             >
               {speedScale.toFixed(2)}x
@@ -766,21 +737,21 @@ const App: React.FC = () => {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 10,
-                padding: "8px 14px",
+                gap: 8,
+                padding: "6px 12px",
                 background: isDark
                   ? "linear-gradient(180deg, rgba(45,55,72,0.92), rgba(45,55,72,0.86))"
                   : "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,247,250,0.96))",
                 border: panelBorder,
-                borderRadius: 12,
-                boxShadow: `${panelShadowInner}, 0 6px 16px ${currentTheme.shadow}`,
-                fontSize: 13,
+                borderRadius: 10,
+                boxShadow: `${panelShadowInner}, 0 4px 12px ${currentTheme.shadow}`,
+                fontSize: 12,
                 fontWeight: 600,
                 color: currentTheme.text,
-                minWidth: 140,
+                minWidth: 120,
               }}
             >
-              <span style={{ fontSize: 16 }}>
+              <span style={{ fontSize: 14 }}>
                 {trainingStatus === "complete"
                   ? "🟢"
                   : trainingStatus === "training"
@@ -798,7 +769,7 @@ const App: React.FC = () => {
                 {accuracy !== null && (
                   <div
                     style={{
-                      fontSize: 11,
+                      fontSize: 10,
                       color: currentTheme.accent,
                       fontFamily: "monospace",
                     }}

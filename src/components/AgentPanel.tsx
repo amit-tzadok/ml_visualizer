@@ -331,27 +331,29 @@ Ready to explore machine learning!`;
             ))}
           </div>
           <div className={styles.inputContainer}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
                 <input type="checkbox" checked={useRag} onChange={(e) => setUseRag(e.target.checked)} />
-                <span style={{ fontSize: 12 }}>Include retrieved context</span>
+                <span>Include retrieved context</span>
               </label>
-              <span style={{ fontSize: 11, opacity: 0.7 }}>({indexReady ? 'index ready' : 'index unavailable'})</span>
+              <span style={{ fontSize: 10, opacity: 0.7 }}>({indexReady ? 'index ready' : 'unavailable'})</span>
             </div>
-            <input
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Ask me about ML, classifiers, or get tips..."
-              className={styles.chatInput}
-            />
-            <button
-              onClick={handleSendMessage}
-              className={styles.sendButton}
-            >
-              Send
-            </button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <input
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Ask me about ML, classifiers..."
+                className={styles.chatInput}
+              />
+              <button
+                onClick={handleSendMessage}
+                className={styles.sendButton}
+              >
+                Send
+              </button>
+            </div>
           </div>
         </div>
       </div>

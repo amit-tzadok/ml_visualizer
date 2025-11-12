@@ -479,6 +479,7 @@ const KNNDemo: React.FC<KnnProps> = ({
         height: "92%",
         overflow: "hidden",
         marginLeft: "-200px",
+        paddingRight: "20px", // Add padding between canvas and right panel
       }}
     >
       {loading && (
@@ -601,7 +602,7 @@ const KNNDemo: React.FC<KnnProps> = ({
           right: 16,
           top: 86,
           zIndex: 1150,
-          padding: "12px",
+          padding: "14px",
           background: panelBg,
           borderRadius: "12px",
           width: 240,
@@ -613,8 +614,8 @@ const KNNDemo: React.FC<KnnProps> = ({
       >
         <div
           style={{
-            marginBottom: 10,
-            paddingBottom: 8,
+            marginBottom: 12,
+            paddingBottom: 10,
             borderBottom: `1px solid ${
               prefersDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
             }`,
@@ -626,7 +627,7 @@ const KNNDemo: React.FC<KnnProps> = ({
           ⚙️ Model Controls
         </div>
 
-        <div style={{ marginBottom: 6 }}>
+        <div style={{ marginBottom: 8 }}>
           <div
             style={{
               fontSize: 11,
@@ -716,6 +717,47 @@ const KNNDemo: React.FC<KnnProps> = ({
               : modeRef.current === "addB"
               ? "🔵 Add Class B (Blue)"
               : "🟢 Predict Class"}
+          </div>
+        </div>
+
+        {/* Instructions section */}
+        <div
+          style={{
+            marginTop: 14,
+            paddingTop: 12,
+            borderTop: `1px solid ${
+              prefersDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"
+            }`,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              marginBottom: 8,
+              opacity: 0.7,
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+            }}
+          >
+            📖 Instructions
+          </div>
+          <div style={{ fontSize: 11, lineHeight: 1.6, opacity: 0.9 }}>
+            <div style={{ marginBottom: 6 }}>
+              <span style={{ fontWeight: 600 }}>Click canvas:</span> Add points
+            </div>
+            <div style={{ marginBottom: 6 }}>
+              <span style={{ fontWeight: 600 }}>A key:</span> Switch to Class A (Red)
+            </div>
+            <div style={{ marginBottom: 6 }}>
+              <span style={{ fontWeight: 600 }}>B key:</span> Switch to Class B (Blue)
+            </div>
+            <div style={{ marginBottom: 6 }}>
+              <span style={{ fontWeight: 600 }}>P key:</span> Predict mode (Green)
+            </div>
+            <div style={{ marginTop: 8, fontSize: 10, opacity: 0.75, fontStyle: "italic" }}>
+              KNN classifies points based on the K nearest neighbors' votes.
+            </div>
           </div>
         </div>
       </div>

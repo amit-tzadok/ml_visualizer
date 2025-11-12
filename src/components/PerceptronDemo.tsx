@@ -1196,11 +1196,11 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
           // Use consistent blue/red coloring: A -> red (#e53e3e), B -> blue (#4299e1)
           p.fill(pt.labelSigned === 1 ? "#e53e3e" : "#4299e1");
           p.stroke(0);
-          p.circle(px, py, 10);
+          p.circle(px, py, 8);
           if (predSigned !== pt.labelSigned) {
             p.noFill();
             p.stroke(0);
-            p.circle(px, py, 14);
+            p.circle(px, py, 12);
           }
         }
 
@@ -1392,11 +1392,12 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
         >
           <div
             style={{
-              padding: 12,
-              borderRadius: 8,
+              padding: 10,
+              borderRadius: 6,
               background: "rgba(0,0,0,0.6)",
               color: "#fff",
               fontWeight: 600,
+              fontSize: 12,
             }}
           >
             Loading demo…
@@ -1425,18 +1426,18 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
         ref={finishedRef}
         style={{
           position: "absolute",
-          top: 10,
+          top: 8,
           left: "50%",
           transform: "translateX(-50%)",
           background: "rgba(0,0,0,0.6)",
           color: "#fff",
-          padding: "8px 12px",
-          borderRadius: 8,
-          fontSize: 12,
+          padding: "6px 10px",
+          borderRadius: 6,
+          fontSize: 11,
           letterSpacing: 0.2,
           display: "none",
           zIndex: 1500,
-          boxShadow: "0 4px 12px rgba(0,0,0,0.25)",
+          boxShadow: "0 3px 10px rgba(0,0,0,0.25)",
         }}
       >
         Training finished

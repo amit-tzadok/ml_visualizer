@@ -25,24 +25,6 @@ const CompareDemo: React.FC<CompareDemoProps> = ({
   theme,
   speedScale = 1,
 }) => {
-  const [dataset, setDataset] = useState<Point[]>(() => {
-    const pts: Point[] = [];
-    for (let i = 0; i < 40; i++) {
-      const x = Math.random() * 2 - 1;
-      const y = Math.random() * 2 - 1;
-      const label = Math.random() > 0.5 ? "A" : "B";
-      pts.push({ x, y, label });
-    }
-    return pts;
-  });
-
-  const [resetToken, setResetToken] = useState<number>(0);
-
-  const onDatasetChange = (updater: ((d: Point[]) => Point[]) | Point[]) => {
-    if (typeof updater === "function") setDataset((d) => (updater as (d: Point[]) => Point[])(d));
-    else setDataset(updater);
-  };
-
   const gaussianRandom = () => {
     let u = 0,
       v = 0;
@@ -83,6 +65,18 @@ const CompareDemo: React.FC<CompareDemoProps> = ({
     return pts;
   };
 
+  const [dataset, setDataset] = useState<Point[]>(() => {
+    // Initialize with a solvable linear dataset
+    return generateLinearDataset(80, 0.12);
+  });
+
+  const [resetToken, setResetToken] = useState<number>(0);
+
+  const onDatasetChange = (updater: ((d: Point[]) => Point[]) | Point[]) => {
+    if (typeof updater === "function") setDataset((d) => (updater as (d: Point[]) => Point[])(d));
+    else setDataset(updater);
+  };
+
   const [datasetSize, setDatasetSize] = useState<number>(80);
   const [noiseLevel, setNoiseLevel] = useState<string>("medium");
   const noiseMap: Record<string, number> = { low: 0.06, medium: 0.12, high: 0.22 };
@@ -96,13 +90,15 @@ const CompareDemo: React.FC<CompareDemoProps> = ({
       theme,
       speedScale,
     };
-    if (type === "knn") return <KnnDemo key={key} {...commonProps} />;
-    if (type === "mlp") return <MlpDemo key={key} {...commonProps} />;
-    return <PerceptronDemo key={key} classifierType={type} {...commonProps} />;
+    // Use a unique key that includes resetToken to force remount when needed
+    const uniqueKey = `${key}-${resetToken}`;
+    if (type === "knn") return <KnnDemo key={uniqueKey} {...commonProps} />;
+    if (type === "mlp") return <MlpDemo key={uniqueKey} {...commonProps} />;
+    return <PerceptronDemo key={uniqueKey} classifierType={type} {...commonProps} />;
   };
 
   return (
-    <div>
+    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
       <div className="compare-controls">
         <div className="compare-control-groups">
           <div className="compare-control">
@@ -168,43 +164,41 @@ const CompareDemo: React.FC<CompareDemoProps> = ({
 
       <div
         style={{
-          display: "flex",
-          gap: 24,
-          justifyContent: "center",
-          alignItems: "flex-start",
-          paddingTop: 16,
-          paddingLeft: 100,
-          minWidth: 0, // Allow shrinking below content width
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 16,
+          padding: "12px 16px",
+          width: "100%",
+          flex: 1,
+          minHeight: 500,
+          maxHeight: "100%",
+          boxSizing: "border-box",
         }}
       >
         <div
           style={{
-            flex: "0 0 560px",
-            height: 560,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: 8,
-            minWidth: 0, // Allow shrinking
+            gap: 6,
+            height: "100%",
           }}
         >
-          <h3 style={{ textAlign: "center", margin: 0, fontSize: "18px", fontWeight: "600" }}>{leftType.toUpperCase()}</h3>
-          <div style={{ width: "100%", height: "100%", border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden" }}>{renderDemo(leftType, "left")}</div>
+          <h3 style={{ textAlign: "center", margin: 0, fontSize: "16px", fontWeight: "600", flexShrink: 0 }}>{leftType.toUpperCase()}</h3>
+          <div style={{ width: "100%", height: "calc(100% - 26px)", border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden", backgroundColor: "rgba(255,255,255,0.5)", position: "relative" }}>{renderDemo(leftType, "left")}</div>
         </div>
 
         <div
           style={{
-            flex: "0 0 560px",
-            height: 560,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: 8,
-            minWidth: 0, // Allow shrinking
+            gap: 6,
+            height: "100%",
           }}
         >
-          <h3 style={{ textAlign: "center", margin: 0, fontSize: "18px", fontWeight: "600" }}>{rightType.toUpperCase()}</h3>
-          <div style={{ width: "100%", height: "100%", border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden" }}>{renderDemo(rightType, "right")}</div>
+          <h3 style={{ textAlign: "center", margin: 0, fontSize: "16px", fontWeight: "600", flexShrink: 0 }}>{rightType.toUpperCase()}</h3>
+          <div style={{ width: "100%", height: "calc(100% - 26px)", border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden", backgroundColor: "rgba(255,255,255,0.5)", position: "relative" }}>{renderDemo(rightType, "right")}</div>
         </div>
       </div>
     </div>
