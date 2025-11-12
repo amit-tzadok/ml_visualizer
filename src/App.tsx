@@ -483,13 +483,11 @@ const App: React.FC = () => {
             position: "relative",
             zIndex: 5,
             boxSizing: "border-box",
-            // reserve space for floating controls (increased for larger gap below canvas)
-            // Increased spacing below the main demo canvas to create a larger visual gap
-            // between the visualization and the floating bottom control panel.
-            // Was 80 -> 120, now 160.
-            paddingBottom: showWelcome ? 0 : 160,
-            paddingRight: showWelcome ? 0 : 40,
-            paddingLeft: showWelcome ? 0 : 40,
+            // reserve space for floating controls; compact panel requires less padding
+            // Was 160, reduce to 104 for a tighter layout while keeping clear separation
+            paddingBottom: showWelcome ? 0 : 104,
+            paddingRight: showWelcome ? 0 : 28,
+            paddingLeft: showWelcome ? 0 : 28,
             transition: "padding 0.3s ease",
           }}
         >
@@ -591,21 +589,20 @@ const App: React.FC = () => {
         <div
           style={{
             position: "fixed",
-            // Increase bottom offset to introduce padding between demo canvas and control bar
-            // Adjust BOTTOM_BAR_OFFSET to fine-tune spacing: higher value -> more gap
-            bottom: 42, // was 26
+            // Compact panel with a slightly smaller stand-off from the bottom
+            bottom: 30, // was 42
             left: "50%",
             transform: "translateX(-50%)",
             display: "flex",
             alignItems: "center",
-            gap: 54, // internal spacing between groups
-            padding: "20px 48px",
+            gap: 24, // was 54
+            padding: "10px 18px", // was 20px 48px
             background: fx ? panelBg : currentTheme.controlBg,
-            borderRadius: 24,
+            borderRadius: 14, // was 24
             boxShadow: fx
               ? `${panelShadowOuter}, ${panelShadowInner}`
-              : `0 8px 22px ${currentTheme.shadow}`,
-            backdropFilter: fx ? "saturate(130%) blur(34px)" : "blur(16px)",
+              : `0 6px 16px ${currentTheme.shadow}`,
+            backdropFilter: fx ? "saturate(120%) blur(22px)" : "blur(12px)",
             border: panelBorder,
             zIndex: 1250,
             transition: "all 0.3s ease",
@@ -616,8 +613,8 @@ const App: React.FC = () => {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              fontSize: 14,
+              gap: 8,
+              fontSize: 13,
               fontWeight: 600,
               color: currentTheme.text,
             }}
@@ -632,17 +629,17 @@ const App: React.FC = () => {
               value={classifier}
               onChange={(e) => setClassifier(e.target.value)}
               style={{
-                padding: "10px 16px",
-                borderRadius: 10,
+                padding: "8px 12px",
+                borderRadius: 8,
                 border: panelBorder,
                 background: isDark
                   ? "linear-gradient(180deg, rgba(55,65,81,0.95), rgba(45,55,72,0.9))"
                   : "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,247,250,0.96))",
                 color: currentTheme.text,
-                fontSize: 14,
+                fontSize: 13,
                 cursor: "pointer",
-                minWidth: 190,
-                boxShadow: `${panelShadowInner}, 0 2px 10px ${currentTheme.shadow}`,
+                minWidth: 160,
+                boxShadow: `${panelShadowInner}, 0 1px 8px ${currentTheme.shadow}`,
                 outline: "none",
               }}
               onFocus={(e) =>
@@ -667,7 +664,7 @@ const App: React.FC = () => {
             aria-hidden
             style={{
               width: 1,
-              height: 32,
+              height: 24,
               background: dividerColor,
               opacity: 1,
               borderRadius: 1,
@@ -679,8 +676,8 @@ const App: React.FC = () => {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 10,
-              fontSize: 14,
+              gap: 8,
+              fontSize: 13,
               fontWeight: 600,
               color: currentTheme.text,
               cursor: "pointer",
@@ -696,8 +693,8 @@ const App: React.FC = () => {
               checked={compare}
               onChange={(e) => setCompare(e.target.checked)}
               style={{
-                width: 18,
-                height: 18,
+                width: 16,
+                height: 16,
                 cursor: "pointer",
                 accentColor: currentTheme.accent,
               }}
@@ -710,7 +707,7 @@ const App: React.FC = () => {
             aria-hidden
             style={{
               width: 1,
-              height: 32,
+              height: 24,
               background: dividerColor,
               opacity: 1,
               borderRadius: 1,
@@ -722,11 +719,11 @@ const App: React.FC = () => {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 12,
-              fontSize: 14,
+              gap: 10,
+              fontSize: 13,
               fontWeight: 600,
               color: currentTheme.text,
-              minWidth: 230,
+              minWidth: 200,
             }}
           >
             <span aria-hidden style={{ fontSize: 16, lineHeight: 1 }}>
@@ -741,9 +738,9 @@ const App: React.FC = () => {
               value={speedScale}
               onChange={(e) => setSpeedScale(Number(e.target.value))}
               style={{
-                width: 180,
+                width: 140,
                 WebkitAppearance: "none",
-                height: 6,
+                height: 5,
                 borderRadius: 999,
                 background: isDark
                   ? "linear-gradient(90deg, rgba(102,126,234,0.5), rgba(118,75,162,0.4))"
@@ -752,7 +749,12 @@ const App: React.FC = () => {
               }}
             />
             <span
-              style={{ width: 56, textAlign: "right", fontFamily: "monospace" }}
+              style={{
+                width: 48,
+                textAlign: "right",
+                fontFamily: "monospace",
+                fontSize: 12,
+              }}
             >
               {speedScale.toFixed(2)}x
             </span>
@@ -764,28 +766,28 @@ const App: React.FC = () => {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 16,
-                padding: "12px 22px",
+                gap: 10,
+                padding: "8px 14px",
                 background: isDark
                   ? "linear-gradient(180deg, rgba(45,55,72,0.92), rgba(45,55,72,0.86))"
                   : "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,247,250,0.96))",
                 border: panelBorder,
-                borderRadius: 18,
-                boxShadow: `${panelShadowInner}, 0 8px 24px ${currentTheme.shadow}`,
-                fontSize: 14,
+                borderRadius: 12,
+                boxShadow: `${panelShadowInner}, 0 6px 16px ${currentTheme.shadow}`,
+                fontSize: 13,
                 fontWeight: 600,
                 color: currentTheme.text,
-                minWidth: 180,
+                minWidth: 140,
               }}
             >
-              <span style={{ fontSize: 18 }}>
+              <span style={{ fontSize: 16 }}>
                 {trainingStatus === "complete"
                   ? "🟢"
                   : trainingStatus === "training"
                   ? "🟡"
                   : "⚪"}
               </span>
-              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
                 <div>
                   {trainingStatus === "complete"
                     ? "Complete"
@@ -796,7 +798,7 @@ const App: React.FC = () => {
                 {accuracy !== null && (
                   <div
                     style={{
-                      fontSize: 12,
+                      fontSize: 11,
                       color: currentTheme.accent,
                       fontFamily: "monospace",
                     }}
