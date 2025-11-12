@@ -35,7 +35,9 @@ const App: React.FC = () => {
   const [showWelcome, setShowWelcome] = useState<boolean>(() => {
     try {
       return localStorage.getItem("mlv_seenWelcome") === "1" ? false : true;
-    } catch {
+    } catch (err) {
+      // Log in development to help diagnose storage permission issues
+      if (isDev()) console.debug('app: localStorage probe failed', err);
       return true;
     }
   });
@@ -57,7 +59,6 @@ const App: React.FC = () => {
   // New modals
   const [showInfoModal, setShowInfoModal] = useState<boolean>(false);
   const [showKeyboardModal, setShowKeyboardModal] = useState<boolean>(false);
-
   const themes = {
     light: {
       background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
@@ -87,6 +88,14 @@ const App: React.FC = () => {
 
   const currentTheme = themes[theme];
   const isDark = theme === "dark";
+  const isDev = () => {
+    try {
+      const proc = (globalThis as unknown as { process?: { env?: { NODE_ENV?: string } } }).process;
+      return !!(proc && proc.env && proc.env.NODE_ENV !== 'production');
+    } catch {
+      return false;
+    }
+  };
   // Bottom panel theming
   const panelBg = isDark
     ? "linear-gradient(180deg, rgba(45,55,72,0.92), rgba(45,55,72,0.86))"
@@ -113,8 +122,8 @@ const App: React.FC = () => {
         } else {
           setGutterTop(showWelcome ? 0 : 12);
         }
-      } catch {
-        // Ignore errors when computing header position
+      } catch (err) {
+        if (isDev()) console.debug('app: compute gutter error', err);
         setGutterTop(showWelcome ? 0 : 12);
       }
     };
@@ -128,14 +137,14 @@ const App: React.FC = () => {
     if (popup) ro.observe(popup as Element);
     const hdr = document.querySelector("header");
     if (hdr) ro.observe(hdr as Element);
-    return () => {
-      window.removeEventListener("resize", compute);
-      try {
-        ro.disconnect();
-      } catch {
-        // Ignore errors when disconnecting ResizeObserver
-      }
-    };
+      return () => {
+        window.removeEventListener("resize", compute);
+        try {
+          ro.disconnect();
+        } catch (err) {
+          if (isDev()) console.debug('app: ResizeObserver disconnect error', err);
+        }
+      };
   }, [showWelcome]);
 
   // keep a live ref of compare mode for the event handler (effect below has empty deps)
@@ -152,7 +161,8 @@ const App: React.FC = () => {
       // simply mark audio as unlocked so UI features depending on it can proceed.
       try {
         setAudioUnlocked(true);
-      } catch {
+      } catch (err) {
+        if (isDev()) console.debug('app: audio unlock error', err);
         setAudioUnlocked(false);
       }
       window.removeEventListener("pointerdown", unlock);
@@ -214,10 +224,11 @@ const App: React.FC = () => {
         osc2.start(now + 0.02);
         osc1.stop(now + 0.5);
         osc2.stop(now + 0.5);
-      } catch {
-        // ignore audio errors
+      } catch (err) {
+        if (isDev()) console.debug('app: playChime audio error', err);
       }
     };
+
     const handler = (e: Event) => {
       try {
         const anyE = e as CustomEvent<Record<string, unknown>>;
@@ -239,10 +250,12 @@ const App: React.FC = () => {
         }
 
         playChime();
-      } catch {
+      } catch (err) {
+        if (isDev()) console.debug('app: demo-finished handler error', err);
         // swallow malformed events
       }
     };
+
     window.addEventListener(
       "mlv:demo-finished",
       handler as unknown as (e: Event) => void
@@ -261,13 +274,15 @@ const App: React.FC = () => {
     const t = setInterval(() => {
       if (!mounted) return;
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const st = (window as any).mlvStatus as Record<string, unknown> | undefined;
+        const st = (window as unknown as { mlvStatus?: Record<string, unknown> }).mlvStatus;
         if (st && typeof st.accuracy === 'number') {
           const a = Number(st.accuracy);
           if (!Number.isNaN(a) && a !== accuracy) setAccuracy(a);
         }
-      } catch {}
+      } catch (err) {
+        // Log unexpected polling errors in dev to aid debugging
+        if (isDev()) console.debug('mlv: status poll error', err);
+      }
     }, 300);
     return () => {
       mounted = false;

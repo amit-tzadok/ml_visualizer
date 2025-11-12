@@ -152,7 +152,7 @@ export class MLPClassifier {
     const out = a[0];
     // guard against non-finite outputs — return a neutral probability and log a message
     if (!Number.isFinite(out) || Number.isNaN(out)) {
-      try { console.error('MLPClassifier.forward produced non-finite output', out); } catch {}
+      try { console.error('MLPClassifier.forward produced non-finite output', out); } catch (err) { void err; }
       return 0.5;
     }
     return out;
@@ -192,7 +192,7 @@ export class MLPClassifier {
 
   const pred = activations[activations.length - 1][0];
   if (!Number.isFinite(pred) || Number.isNaN(pred)) {
-    try { console.error('MLPClassifier.trainSample: non-finite prediction, aborting sample update', pred); } catch {}
+    try { console.error('MLPClassifier.trainSample: non-finite prediction, aborting sample update', pred); } catch (err) { void err; }
     return;
   }
   // For binary classification with sigmoid output and cross-entropy loss,
@@ -262,7 +262,9 @@ export class MLPClassifier {
       if (w > this._WEIGHT_CLAMP) w = this._WEIGHT_CLAMP;
       if (w < -this._WEIGHT_CLAMP) w = -this._WEIGHT_CLAMP;
       this.weights[layer][j][k] = w;
-    } catch {}
+    } catch (err) {
+      try { if (typeof console !== 'undefined' && console && console.debug) console.debug('mlp: weight clamp error', err); } catch { void 0; }
+    }
   }
 
   private applyBiasUpdate(layer: number, j: number, grad: number, eta: number) {
@@ -289,7 +291,9 @@ export class MLPClassifier {
       if (b > this._WEIGHT_CLAMP) b = this._WEIGHT_CLAMP;
       if (b < -this._WEIGHT_CLAMP) b = -this._WEIGHT_CLAMP;
       this.biases[layer][j] = b;
-    } catch {}
+    } catch (err) {
+      try { if (typeof console !== 'undefined' && console && console.debug) console.debug('mlp: bias clamp error', err); } catch { void 0; }
+    }
   }
 
   /**
@@ -310,14 +314,14 @@ export class MLPClassifier {
     const n = X.length;
     const idx = Array.from({ length: n }, (_, i) => i);
     for (let epoch = 0; epoch < epochs; epoch++) {
-      try {
-        // epoch body
-      } catch (err) {
-        try { console.error('MLPClassifier.fit: epoch error', err); } catch {}
-        // push NaN to signal failure and break
-        losses.push(NaN);
-        break;
-      }
+        try {
+          // epoch body
+        } catch (err) {
+          try { console.error('MLPClassifier.fit: epoch error', err); } catch (e) { void e; }
+          // push NaN to signal failure and break
+          losses.push(NaN);
+          break;
+        }
       if (shuffle) {
         for (let i = n - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
@@ -335,7 +339,7 @@ export class MLPClassifier {
       const L = this.loss(X, y);
       losses.push(L);
       if (typeof onEpoch === "function") {
-        try { onEpoch(epoch, L); } catch { /* allow callback errors to be handled by caller */ }
+        try { onEpoch(epoch, L); } catch (err) { if (typeof console !== 'undefined' && console && console.debug) console.debug('mlp: onEpoch callback error', err); }
       }
     }
     return losses;

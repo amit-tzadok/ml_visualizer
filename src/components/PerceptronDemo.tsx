@@ -1259,24 +1259,32 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
               const xL = -1;
               const yAtXL = -(w0 * xL + bias) / w1;
               pushIfValid(xL, yAtXL);
-            } catch {}
+            } catch (err) {
+              if (isDev()) console.debug("perceptron: intersection compute error", err);
+            }
             try {
               const xR = 1;
               const yAtXR = -(w0 * xR + bias) / w1;
               pushIfValid(xR, yAtXR);
-            } catch {}
+            } catch (err) {
+              if (isDev()) console.debug("perceptron: intersection compute error", err);
+            }
             // Intersections with horizontal bounds y = -1 and y = 1 (solve for x)
             if (Math.abs(w0) > 1e-12) {
               try {
                 const yB = -1;
                 const xAtYB = -(w1 * yB + bias) / w0;
                 pushIfValid(xAtYB, yB);
-              } catch {}
+              } catch (err) {
+                if (isDev()) console.debug("perceptron: intersection compute error", err);
+              }
               try {
                 const yT = 1;
                 const xAtYT = -(w1 * yT + bias) / w0;
                 pushIfValid(xAtYT, yT);
-              } catch {}
+              } catch (err) {
+                if (isDev()) console.debug("perceptron: intersection compute error", err);
+              }
             }
             // Deduplicate approx-equal points
             const uniq: Array<{ x: number; y: number }> = [];

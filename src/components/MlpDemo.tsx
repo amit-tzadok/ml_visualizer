@@ -139,7 +139,9 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
       (p as unknown as { suppressStatus?: (ms: number) => void }).suppressStatus = (ms: number) => {
         try {
           _suppressStatusUntil = Date.now() + Math.max(0, Number(ms) || 0);
-        } catch {}
+        } catch (err) {
+          if (isDev()) console.debug('mlp: prevPreds reset error', err);
+        }
       };
 
       const resetModel = (hidden: number[] = []) => {
@@ -160,7 +162,7 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
           activation: act,
         });
         // reset smoothing buffer when model is recreated
-        try { prevPreds = null; prevCols = 0; prevRows = 0; } catch {}
+  try { prevPreds = null; prevCols = 0; prevRows = 0; } catch (err) { if (isDev()) console.debug('mlp: prevPreds reset error', err); }
       };
 
       const resetDemo = () => {
@@ -275,7 +277,7 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
             gridStep = overrideStep;
             gridDirty = true;
             // reset smoothing buffer when grid resolution changes
-            try { prevPreds = null; prevCols = 0; prevRows = 0; } catch {}
+            try { prevPreds = null; prevCols = 0; prevRows = 0; } catch (err) { if (isDev()) console.debug('mlp: prevPreds reset error', err); }
           };
           p._mlpControls = {
             // Use ref-backed values; fall back to stable literals so the sketch-creation effect
@@ -285,66 +287,150 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
             },
             set optimizer(v: string) {
               try {
-                if (!controlsRef.current) controlsRef.current = { optimizer: v, activation: "sigmoid", lr: 0.3, batchSize: 8, epochs: 100, hiddenUnits: 16, touchClass: "A", setGridStep: controlsRef.current?.setGridStep ?? (() => {}) } as any;
+                if (!controlsRef.current)
+                  controlsRef.current = {
+                    optimizer: v,
+                    activation: "sigmoid",
+                    lr: 0.3,
+                    batchSize: 8,
+                    epochs: 100,
+                    hiddenUnits: 16,
+                    touchClass: "A",
+                    setGridStep: controlsRef.current?.setGridStep ?? (() => {}),
+                  } as unknown as NonNullable<typeof controlsRef.current>;
                 else controlsRef.current.optimizer = v;
                 gridDirty = true;
-              } catch {}
+              } catch (err) {
+                if (isDev()) console.debug('mlp: control init error', err);
+              }
             },
             get activation() {
               return controlsRef.current?.activation ?? "sigmoid";
             },
             set activation(v: string) {
               try {
-                if (!controlsRef.current) controlsRef.current = { optimizer: "sgd", activation: v, lr: 0.3, batchSize: 8, epochs: 100, hiddenUnits: 16, touchClass: "A", setGridStep: controlsRef.current?.setGridStep ?? (() => {}) } as any;
+                if (!controlsRef.current)
+                  controlsRef.current = {
+                    optimizer: "sgd",
+                    activation: v,
+                    lr: 0.3,
+                    batchSize: 8,
+                    epochs: 100,
+                    hiddenUnits: 16,
+                    touchClass: "A",
+                    setGridStep: controlsRef.current?.setGridStep ?? (() => {}),
+                  } as unknown as NonNullable<typeof controlsRef.current>;
                 else controlsRef.current.activation = v;
                 gridDirty = true;
-              } catch {}
+              } catch (err) {
+                if (isDev()) console.debug('mlp: fullFit finalAccuracy error', err);
+              }
             },
             get lr() {
               return controlsRef.current?.lr ?? 0.3;
             },
             set lr(v: number) {
               try {
-                if (!controlsRef.current) controlsRef.current = { optimizer: "sgd", activation: "sigmoid", lr: v, batchSize: 8, epochs: 100, hiddenUnits: 16, touchClass: "A", setGridStep: controlsRef.current?.setGridStep ?? (() => {}) } as any;
+                if (!controlsRef.current)
+                  controlsRef.current = {
+                    optimizer: "sgd",
+                    activation: "sigmoid",
+                    lr: v,
+                    batchSize: 8,
+                    epochs: 100,
+                    hiddenUnits: 16,
+                    touchClass: "A",
+                    setGridStep: controlsRef.current?.setGridStep ?? (() => {}),
+                  } as unknown as NonNullable<typeof controlsRef.current>;
                 else controlsRef.current.lr = v;
-              } catch {}
+              } catch (err) {
+                if (isDev()) console.debug('mlp: lr setter error', err);
+              }
             },
             get batchSize() {
               return controlsRef.current?.batchSize ?? 8;
             },
             set batchSize(v: number) {
               try {
-                if (!controlsRef.current) controlsRef.current = { optimizer: "sgd", activation: "sigmoid", lr: 0.3, batchSize: v, epochs: 100, hiddenUnits: 16, touchClass: "A", setGridStep: controlsRef.current?.setGridStep ?? (() => {}) } as any;
+                if (!controlsRef.current)
+                  controlsRef.current = {
+                    optimizer: "sgd",
+                    activation: "sigmoid",
+                    lr: 0.3,
+                    batchSize: v,
+                    epochs: 100,
+                    hiddenUnits: 16,
+                    touchClass: "A",
+                    setGridStep: controlsRef.current?.setGridStep ?? (() => {}),
+                  } as unknown as NonNullable<typeof controlsRef.current>;
                 else controlsRef.current.batchSize = v;
-              } catch {}
+              } catch (err) {
+                if (isDev()) console.debug('mlp: batchSize setter error', err);
+              }
             },
             get epochs() {
               return controlsRef.current?.epochs ?? 100;
             },
             set epochs(v: number) {
               try {
-                if (!controlsRef.current) controlsRef.current = { optimizer: "sgd", activation: "sigmoid", lr: 0.3, batchSize: 8, epochs: v, hiddenUnits: 16, touchClass: "A", setGridStep: controlsRef.current?.setGridStep ?? (() => {}) } as any;
+                if (!controlsRef.current)
+                  controlsRef.current = {
+                    optimizer: "sgd",
+                    activation: "sigmoid",
+                    lr: 0.3,
+                    batchSize: 8,
+                    epochs: v,
+                    hiddenUnits: 16,
+                    touchClass: "A",
+                    setGridStep: controlsRef.current?.setGridStep ?? (() => {}),
+                  } as unknown as NonNullable<typeof controlsRef.current>;
                 else controlsRef.current.epochs = v;
-              } catch {}
+              } catch (err) {
+                if (isDev()) console.debug('mlp: epochs setter error', err);
+              }
             },
             get hiddenUnits() {
               return controlsRef.current?.hiddenUnits ?? 16;
             },
             set hiddenUnits(v: number) {
               try {
-                if (!controlsRef.current) controlsRef.current = { optimizer: "sgd", activation: "sigmoid", lr: 0.3, batchSize: 8, epochs: 100, hiddenUnits: v, touchClass: "A", setGridStep: controlsRef.current?.setGridStep ?? (() => {}) } as any;
+                if (!controlsRef.current)
+                  controlsRef.current = {
+                    optimizer: "sgd",
+                    activation: "sigmoid",
+                    lr: 0.3,
+                    batchSize: 8,
+                    epochs: 100,
+                    hiddenUnits: v,
+                    touchClass: "A",
+                    setGridStep: controlsRef.current?.setGridStep ?? (() => {}),
+                  } as unknown as NonNullable<typeof controlsRef.current>;
                 else controlsRef.current.hiddenUnits = v;
                 gridDirty = true;
-              } catch {}
+              } catch (err) {
+                if (isDev()) console.debug('mlp: hiddenUnits setter error', err);
+              }
             },
             get touchClass() {
               return controlsRef.current?.touchClass ?? "A";
             },
             set touchClass(v: "A" | "B") {
               try {
-                if (!controlsRef.current) controlsRef.current = { optimizer: "sgd", activation: "sigmoid", lr: 0.3, batchSize: 8, epochs: 100, hiddenUnits: 16, touchClass: v, setGridStep: controlsRef.current?.setGridStep ?? (() => {}) } as any;
+                if (!controlsRef.current)
+                  controlsRef.current = {
+                    optimizer: "sgd",
+                    activation: "sigmoid",
+                    lr: 0.3,
+                    batchSize: 8,
+                    epochs: 100,
+                    hiddenUnits: 16,
+                    touchClass: v,
+                    setGridStep: controlsRef.current?.setGridStep ?? (() => {}),
+                  } as unknown as NonNullable<typeof controlsRef.current>;
                 else controlsRef.current.touchClass = v;
-              } catch {}
+              } catch (err) {
+                if (isDev()) console.debug('mlp: touchClass setter error', err);
+              }
             },
             setGridStep: (v: number) => {
               try {
@@ -661,12 +747,13 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
           if (isDev()) console.debug('mlp: p.loop error', err);
         }
         if (isDev()) {
-          try { console.debug('mlp: trainMLP called', { epochs: trainingEpochsRemaining, lr: trainingLR, samples: X.length }); } catch {}
+          try { console.debug('mlp: trainMLP called', { epochs: trainingEpochsRemaining, lr: trainingLR, samples: X.length }); } catch (err) { console.debug('mlp: trainMLP debug log failed', err); }
         }
         try {
           startedAtMs =
             performance && performance.now ? performance.now() : Date.now();
-        } catch {
+        } catch (err) {
+          if (isDev()) console.debug('mlp: performance.now probe error', err);
           startedAtMs = Date.now();
         }
         try {
@@ -700,15 +787,17 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
               try {
                 p._lastLoss = L;
                 if (ep % 10 === 0) gridDirty = true;
-              } catch {}
+              } catch (err) {
+                if (isDev()) console.debug('mlp: onEpoch hook error', err);
+              }
             } });
-            try { lastLoss = Array.isArray(losses) && losses.length ? losses[losses.length - 1] : lastLoss; } catch {}
-            try { finalAccuracy = model.accuracy(X, y); } catch {}
+            try { lastLoss = Array.isArray(losses) && losses.length ? losses[losses.length - 1] : lastLoss; } catch (err) { if (isDev()) console.debug('mlp: fullFit lastLoss calc error', err); }
+            try { finalAccuracy = model.accuracy(X, y); } catch (err) { if (isDev()) console.debug('mlp: fullFit accuracy calc error', err); }
             // stop early if perfect accuracy reached
             if (finalAccuracy >= 1.0) break;
             // otherwise continue another deterministic pass (no shuffle)
             if (isDev()) {
-              try { console.debug('mlp: fullFit attempt', attempt, { lastLoss, finalAccuracy }); } catch {}
+              try { console.debug('mlp: fullFit attempt', attempt, { lastLoss, finalAccuracy }); } catch (err) { if (isDev()) console.debug('mlp: fullFit attempt log failed', err); }
             }
           }
           const elapsed = (Date.now() - startMs) / 1000;
@@ -716,7 +805,9 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
             window.dispatchEvent(
               new CustomEvent('mlv:demo-finished', { detail: { classifier: 'Neural Network (MLP)', reason: 'train-complete', accuracy: finalAccuracy, elapsedSec: elapsed } })
             );
-          } catch {}
+          } catch (err) {
+            if (isDev()) console.debug('mlp: prevPreds reset error', err);
+          }
           try {
             if (finishedRef.current) {
               finishedRef.current.innerText = typeof p._lastLoss === 'number'
@@ -724,7 +815,9 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
                 : `Training finished • Time: ${elapsed.toFixed(2)}s`;
               finishedRef.current.style.display = 'block';
             }
-          } catch {}
+            } catch (err) {
+              if (isDev()) console.debug('mlp: control init error', err);
+            }
           gridDirty = true;
         } catch (err) {
           if (isDev()) console.debug('mlp: fullFit error', err);
@@ -770,19 +863,18 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
       try {
         const mod = await loadP5();
         if (!mounted) return;
-        // `mod` can be either the p5 constructor or a module with a default export.
-        // Use a narrow eslint disable for the `any` cast here since it's a runtime import.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const P5 = (mod && (mod as any).default) || mod;
+    // `mod` can be either the p5 constructor or a module with a default export.
+    // Use an unknown-based cast for the runtime import to avoid `any`.
+    const P5 = (mod && (mod as unknown as { default?: unknown }).default) || mod;
         if (p5Ref.current) {
           p5Ref.current.remove();
           p5Ref.current = null;
         }
         const root = localRoot;
-        p5Ref.current = new P5(
-          sketch,
-          root as Element
-        ) as unknown as P5Instance;
+        // P5 may be a module default or the constructor itself. Narrow to a callable constructor
+        type P5Constructor = new (sketch: (p: P5Instance) => void, element?: Element) => unknown;
+        const P5Ctor = (P5 as unknown) as P5Constructor;
+        p5Ref.current = new P5Ctor(sketch as unknown as (p: P5Instance) => void, root as Element) as unknown as P5Instance;
         setLoading(false);
         setLoadError(null);
       } catch (err) {
@@ -880,8 +972,11 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
         if (typeof L === "number") setLoss(L);
         // show debug status in dev mode
         try {
-          const s = (p5Ref.current as unknown as any)._mlpStatus;
-        } catch {}
+          // Touch the p5 instance status field in dev mode (no-op) without creating a local unused variable
+          void ((p5Ref.current as unknown as { _mlpStatus?: Record<string, unknown> })?._mlpStatus);
+        } catch (err) {
+          if (isDev()) console.debug('mlp: dynamic import p5 failed', err);
+        }
       }
     }, 200);
     return () => clearInterval(int);
@@ -891,14 +986,15 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
   useEffect(() => {
     if (!isDev()) return;
     const t = setInterval(() => {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const st = (window as any).mlvStatus;
-        if (st) {
-          if (typeof st.meanPred === 'number') setMlpMeanPred(st.meanPred as number);
-          if (typeof st.accuracy === 'number') setMlpAcc(st.accuracy as number);
+        try {
+          const st = (window as unknown as { mlvStatus?: Record<string, unknown> }).mlvStatus;
+          if (st) {
+            if (typeof st.meanPred === 'number') setMlpMeanPred(st.meanPred as number);
+            if (typeof st.accuracy === 'number') setMlpAcc(st.accuracy as number);
+          }
+        } catch (err) {
+          if (isDev()) console.debug('mlp: window.mlvStatus poll error', err);
         }
-      } catch {}
     }, 300);
     return () => clearInterval(t);
   }, []);
@@ -1072,23 +1168,29 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
           onClick={() => {
               setLoss(null);
               // reset runtime diagnostics shown in the UI
-              try {
-                setMlpAcc(null);
-                setMlpMeanPred(null);
-                // also clear the published global status if present
                 try {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (window as any).mlvStatus = undefined;
-                } catch {}
-              } catch {}
+                  setMlpAcc(null);
+                  setMlpMeanPred(null);
+                  // also clear the published global status if present (narrow cast)
+                  try {
+                    (window as unknown as { mlvStatus?: unknown }).mlvStatus = undefined;
+                  } catch (err) {
+                    if (isDev()) console.debug('mlp: clear mlvStatus error', err);
+                  }
+                } catch (err) {
+                  if (isDev()) console.debug('mlp: reset diagnostics error', err);
+                }
               if (
                 p5Ref.current &&
                 typeof p5Ref.current.resetDemo === "function"
               ) {
-              try {
-                // suppress status publishing for 400ms so overlays stay cleared after reset
-                if (typeof (p5Ref.current as any).suppressStatus === 'function') (p5Ref.current as any).suppressStatus(400);
-              } catch {}
+                try {
+                  // suppress status publishing for 400ms so overlays stay cleared after reset
+                  const inst = p5Ref.current as unknown as { suppressStatus?: (ms: number) => void } | null;
+                  if (inst && typeof inst.suppressStatus === 'function') inst.suppressStatus(400);
+                } catch (err) {
+                  if (isDev()) console.debug('mlp: suppressStatus error', err);
+                }
               p5Ref.current.resetDemo();
               }
           }}
@@ -1119,18 +1221,22 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
           🔄 Reset
         </button>
         <button
-          onClick={() => {
-            // run a blocking, full-fit on the current model/dataset
-            try {
-              const ctrlEpochs = controlsRef.current?.epochs ?? 200;
-              const inst = p5Ref.current as unknown as any;
-              if (inst && typeof inst.fullFit === 'function') {
-                inst.fullFit({ epochs: Math.max(50, Number(ctrlEpochs)), lr: controlsRef.current?.lr, batchSize: controlsRef.current?.batchSize ?? undefined });
+            onClick={() => {
+              // run a blocking, full-fit on the current model/dataset
+              try {
+                const ctrlEpochs = controlsRef.current?.epochs ?? 200;
+                const inst = p5Ref.current as unknown as { fullFit?: (opts?: { epochs?: number; lr?: number; batchSize?: number }) => void } | null;
+                if (inst && typeof inst.fullFit === 'function') {
+                  inst.fullFit({ epochs: Math.max(50, Number(ctrlEpochs)), lr: controlsRef.current?.lr, batchSize: controlsRef.current?.batchSize ?? undefined });
+                }
+              } catch (err) {
+                try {
+                  if (isDev()) console.debug('mlp: full-fit click error', err);
+                } catch (err2) {
+                  if (isDev()) console.debug('mlp: full-fit click debug error', err2);
+                }
               }
-            } catch (err) {
-              try { if (isDev()) console.debug('mlp: full-fit click error', err); } catch {}
-            }
-          }}
+            }}
           style={{
             padding: "8px 16px",
             fontSize: 12,
@@ -1147,11 +1253,12 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
           ⚡ Full-fit
         </button>
         <button
-          onClick={() => {
-            const ctrlEpochs = controlsRef.current?.epochs ?? 100;
-            p5Ref.current && typeof p5Ref.current.trainMLP === "function" &&
-              p5Ref.current.trainMLP({ epochs: Number(ctrlEpochs) });
-          }}
+            onClick={() => {
+              const ctrlEpochs = controlsRef.current?.epochs ?? 100;
+              if (p5Ref.current && typeof p5Ref.current.trainMLP === "function") {
+                p5Ref.current.trainMLP({ epochs: Number(ctrlEpochs) });
+              }
+            }}
           style={{
             padding: "8px 16px",
             fontSize: 12,

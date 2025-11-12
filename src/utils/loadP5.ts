@@ -31,7 +31,17 @@ export default async function loadP5(): Promise<unknown> {
       s.async = true;
       s.defer = false;
       s.onload = () => {
-        try { (s as HTMLScriptElement).setAttribute('data-loaded', '1'); } catch { /* ignore */ }
+        try {
+          (s as HTMLScriptElement).setAttribute('data-loaded', '1');
+        } catch (err) {
+          try {
+            const maybeProc = (globalThis as unknown as { process?: { env?: { NODE_ENV?: string } } }).process;
+            if (maybeProc && maybeProc.env && maybeProc.env.NODE_ENV !== 'production')
+              console.debug('loadP5: setAttribute error', err);
+          } catch {
+            void 0;
+          }
+        }
         resolve();
       };
       s.onerror = () => reject(new Error('p5 CDN load failed'));
