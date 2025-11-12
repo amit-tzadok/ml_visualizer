@@ -39,7 +39,7 @@ const App: React.FC = () => {
       return true;
     }
   });
-  const [fx, setFx] = useState<boolean>(true);
+  const [fx] = useState<boolean>(true);
   const [speedScale, setSpeedScale] = useState<number>(1);
   const [showAgent, setShowAgent] = useState<boolean>(false);
   // Training status badge
