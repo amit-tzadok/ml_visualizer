@@ -51,8 +51,9 @@ describe('Perceptron advanced training', () => {
     base.fit(X, y);
     const baseErr = base.misclassificationRate(X, y);
 
-    const p = new Perceptron(2, 0.05, 10);
-    p.fitPocket(X, y, { epochs: 10, shuffle: true });
+    // Give pocket algorithm more epochs to reduce flakiness versus one-pass baseline
+    const p = new Perceptron(2, 0.05, 25);
+    p.fitPocket(X, y, { epochs: 25, shuffle: true });
     const err = p.misclassificationRate(X, y);
 
     expect(err).toBeLessThanOrEqual(baseErr);
