@@ -255,6 +255,26 @@ const App: React.FC = () => {
     };
   }, [audioUnlocked]);
 
+  // Poll window.mlvStatus periodically to keep the global accuracy badge in sync
+  React.useEffect(() => {
+    let mounted = true;
+    const t = setInterval(() => {
+      if (!mounted) return;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const st = (window as any).mlvStatus as Record<string, unknown> | undefined;
+        if (st && typeof st.accuracy === 'number') {
+          const a = Number(st.accuracy);
+          if (!Number.isNaN(a) && a !== accuracy) setAccuracy(a);
+        }
+      } catch {}
+    }, 300);
+    return () => {
+      mounted = false;
+      clearInterval(t);
+    };
+  }, [accuracy]);
+
   // fixed gutter on the right to prevent overlays from covering the demo
   const GUTTER_WIDTH = 400; // px reserved on the right for sidebar and popups (adjustable)
 
@@ -598,7 +618,18 @@ const App: React.FC = () => {
             </span>
             <select
               value={classifier}
-              onChange={(e) => setClassifier(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value;
+                // If the user chooses KNN while in compare mode, exit compare mode
+                // and switch to the standalone KNN demo. Bump runKey to force remount.
+                if (v === "knn" && compare) {
+                  setCompare(false);
+                  setClassifier(v);
+                  _setRunKey((k) => k + 1);
+                } else {
+                  setClassifier(v);
+                }
+              }}
               style={{
                 padding: "6px 10px",
                 borderRadius: 6,

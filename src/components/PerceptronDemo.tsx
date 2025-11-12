@@ -1243,16 +1243,68 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
           const w0 = weights[0];
           const w1 = weights[1];
           if (Math.abs(w1) > 1e-6) {
-            const x1 = -1,
-              x2 = 1;
-            const y1 = -(w0 * x1 + bias) / w1;
-            const y2 = -(w0 * x2 + bias) / w1;
-            p.line(
-              p.map(x1, -1, 1, 0, p.width),
-              p.map(y1, -1, 1, p.height, 0),
-              p.map(x2, -1, 1, 0, p.width),
-              p.map(y2, -1, 1, p.height, 0)
-            );
+            // Compute intersections of the infinite decision line with the
+            // normalized canvas rectangle [-1,1]x[-1,1] and draw only the
+            // segment that lies within the visible canvas. This prevents the
+            // visible stroke from appearing to start off-screen when the
+            // line would otherwise be extrapolated outside the viewport.
+            const pts: Array<{ x: number; y: number }> = [];
+            const pushIfValid = (x: number, y: number) => {
+              if (x >= -1 - 1e-8 && x <= 1 + 1e-8 && y >= -1 - 1e-8 && y <= 1 + 1e-8) {
+                pts.push({ x: Math.max(-1, Math.min(1, x)), y: Math.max(-1, Math.min(1, y)) });
+              }
+            };
+            // Intersections with vertical bounds x = -1 and x = 1
+            try {
+              const xL = -1;
+              const yAtXL = -(w0 * xL + bias) / w1;
+              pushIfValid(xL, yAtXL);
+            } catch {}
+            try {
+              const xR = 1;
+              const yAtXR = -(w0 * xR + bias) / w1;
+              pushIfValid(xR, yAtXR);
+            } catch {}
+            // Intersections with horizontal bounds y = -1 and y = 1 (solve for x)
+            if (Math.abs(w0) > 1e-12) {
+              try {
+                const yB = -1;
+                const xAtYB = -(w1 * yB + bias) / w0;
+                pushIfValid(xAtYB, yB);
+              } catch {}
+              try {
+                const yT = 1;
+                const xAtYT = -(w1 * yT + bias) / w0;
+                pushIfValid(xAtYT, yT);
+              } catch {}
+            }
+            // Deduplicate approx-equal points
+            const uniq: Array<{ x: number; y: number }> = [];
+            for (const pnt of pts) {
+              if (!uniq.some((q) => Math.hypot(q.x - pnt.x, q.y - pnt.y) < 1e-6)) uniq.push(pnt);
+            }
+            if (uniq.length >= 2) {
+              // Pick two extreme points to draw the segment
+              const [pA, pB] = [uniq[0], uniq[1]];
+              p.line(
+                p.map(pA.x, -1, 1, 0, p.width),
+                p.map(pA.y, -1, 1, p.height, 0),
+                p.map(pB.x, -1, 1, 0, p.width),
+                p.map(pB.y, -1, 1, p.height, 0)
+              );
+            } else {
+              // Fallback: draw across full width (previous behavior)
+              const x1 = -1,
+                x2 = 1;
+              const y1 = -(w0 * x1 + bias) / w1;
+              const y2 = -(w0 * x2 + bias) / w1;
+              p.line(
+                p.map(x1, -1, 1, 0, p.width),
+                p.map(y1, -1, 1, p.height, 0),
+                p.map(x2, -1, 1, 0, p.width),
+                p.map(y2, -1, 1, p.height, 0)
+              );
+            }
           } else if (Math.abs(w0) > 1e-6) {
             // vertical boundary: x = -b / w0
             const xNorm = -bias / w0;

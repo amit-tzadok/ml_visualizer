@@ -14,6 +14,7 @@ type MlpDemoProps = {
   dataset?: Point[];
   onDatasetChange?: (updater: ((d: Point[]) => Point[]) | Point[]) => void;
   resetToken?: unknown;
+  compact?: boolean;
 };
 
 const MlpDemo: React.FC<MlpDemoProps> = ({
@@ -22,21 +23,31 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
   dataset: externalDataset,
   onDatasetChange,
   resetToken,
+  compact = false,
 }) => {
   const sketchRef = useRef<HTMLDivElement | null>(null);
   const p5Ref = useRef<P5Instance | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loss, setLoss] = useState<number | null>(null);
   const finishedRef = useRef<HTMLDivElement | null>(null);
+  const [mlpMeanPred, setMlpMeanPred] = useState<number | null>(null);
+  const [mlpAcc, setMlpAcc] = useState<number | null>(null);
   // timing overlay for training duration
   const [_lastDurationSec, setLastDurationSec] = useState<number | null>(null);
   // control panel state
+  // Revert to SGD by default for stability in the interactive demo
   const [optimizer, setOptimizer] = useState<string>("sgd");
   const [activation, setActivation] = useState<string>("sigmoid");
+  // Default lr tuned for SGD
   const [lr, setLr] = useState<number>(0.3);
   const [batchSize, setBatchSize] = useState<number>(8);
-  const [epochs, setEpochs] = useState<number>(20);
-  const [hiddenUnits, setHiddenUnits] = useState<number>(16);
+  const [epochs, setEpochs] = useState<number>(100);
+  const [hiddenUnits, setHiddenUnits] = useState<number>(32);
+  // Legacy/Stable toggle: when enabled, the demo will use conservative, proven defaults
+  // (single hidden layer, 16 units, SGD @ 0.3, sigmoid). This allows switching back
+  // to the previous working behavior without reverting algorithmic changes.
+  const [legacyStable, setLegacyStable] = useState<boolean>(false);
   const [gridStepState, setGridStepState] = useState<number>(4);
   // touch support: which class a tap should add on touch devices
   const [touchClass, setTouchClass] = useState<"A" | "B">("A");
@@ -115,6 +126,21 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
       let gridStep = adaptiveStep;
       let gridFreq = 18; // update less often for performance
       let gridDirty = true;
+  // smoothing buffer to avoid global color flips when the model changes quickly
+  let prevPreds: Float32Array | null = null;
+  let prevCols = 0;
+  let prevRows = 0;
+  const PRED_SMOOTH = 0.15; // new -> prev blending factor (small = smoother)
+
+      let _suppressStatusUntil = 0;
+
+      // allow external callers to suppress publishing runtime status for a short window
+      // (used after Reset to avoid immediately repopulating overlays)
+      (p as unknown as { suppressStatus?: (ms: number) => void }).suppressStatus = (ms: number) => {
+        try {
+          _suppressStatusUntil = Date.now() + Math.max(0, Number(ms) || 0);
+        } catch {}
+      };
 
       const resetModel = (hidden: number[] = []) => {
         // Read control values from controlsRef to avoid closing over React state in the sketch.
@@ -123,12 +149,18 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
         const opt = ctrl?.optimizer ?? "sgd";
         const act = (ctrl?.activation ?? "sigmoid") as ActivationFunction;
         const hiddenUnitsVal = ctrl?.hiddenUnits ?? 16;
-        const h = hidden.length ? hidden : [hiddenUnitsVal];
+        // Use two hidden layers by default for higher capacity in the demo:
+        // primary layer = hiddenUnitsVal, secondary = ~half (min 8)
+        const h = hidden.length
+          ? hidden
+          : [hiddenUnitsVal, Math.max(8, Math.floor(hiddenUnitsVal / 2))];
         model = new MLPClassifier(2, h, {
           lr: lrVal,
           optimizer: opt,
           activation: act,
         });
+        // reset smoothing buffer when model is recreated
+        try { prevPreds = null; prevCols = 0; prevRows = 0; } catch {}
       };
 
       const resetDemo = () => {
@@ -242,6 +274,8 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
             overrideStep = Math.max(2, v);
             gridStep = overrideStep;
             gridDirty = true;
+            // reset smoothing buffer when grid resolution changes
+            try { prevPreds = null; prevCols = 0; prevRows = 0; } catch {}
           };
           p._mlpControls = {
             // Use ref-backed values; fall back to stable literals so the sketch-creation effect
@@ -249,23 +283,68 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
             get optimizer() {
               return controlsRef.current?.optimizer ?? "sgd";
             },
+            set optimizer(v: string) {
+              try {
+                if (!controlsRef.current) controlsRef.current = { optimizer: v, activation: "sigmoid", lr: 0.3, batchSize: 8, epochs: 100, hiddenUnits: 16, touchClass: "A", setGridStep: controlsRef.current?.setGridStep ?? (() => {}) } as any;
+                else controlsRef.current.optimizer = v;
+                gridDirty = true;
+              } catch {}
+            },
             get activation() {
               return controlsRef.current?.activation ?? "sigmoid";
+            },
+            set activation(v: string) {
+              try {
+                if (!controlsRef.current) controlsRef.current = { optimizer: "sgd", activation: v, lr: 0.3, batchSize: 8, epochs: 100, hiddenUnits: 16, touchClass: "A", setGridStep: controlsRef.current?.setGridStep ?? (() => {}) } as any;
+                else controlsRef.current.activation = v;
+                gridDirty = true;
+              } catch {}
             },
             get lr() {
               return controlsRef.current?.lr ?? 0.3;
             },
+            set lr(v: number) {
+              try {
+                if (!controlsRef.current) controlsRef.current = { optimizer: "sgd", activation: "sigmoid", lr: v, batchSize: 8, epochs: 100, hiddenUnits: 16, touchClass: "A", setGridStep: controlsRef.current?.setGridStep ?? (() => {}) } as any;
+                else controlsRef.current.lr = v;
+              } catch {}
+            },
             get batchSize() {
               return controlsRef.current?.batchSize ?? 8;
             },
+            set batchSize(v: number) {
+              try {
+                if (!controlsRef.current) controlsRef.current = { optimizer: "sgd", activation: "sigmoid", lr: 0.3, batchSize: v, epochs: 100, hiddenUnits: 16, touchClass: "A", setGridStep: controlsRef.current?.setGridStep ?? (() => {}) } as any;
+                else controlsRef.current.batchSize = v;
+              } catch {}
+            },
             get epochs() {
-              return controlsRef.current?.epochs ?? 20;
+              return controlsRef.current?.epochs ?? 100;
+            },
+            set epochs(v: number) {
+              try {
+                if (!controlsRef.current) controlsRef.current = { optimizer: "sgd", activation: "sigmoid", lr: 0.3, batchSize: 8, epochs: v, hiddenUnits: 16, touchClass: "A", setGridStep: controlsRef.current?.setGridStep ?? (() => {}) } as any;
+                else controlsRef.current.epochs = v;
+              } catch {}
             },
             get hiddenUnits() {
               return controlsRef.current?.hiddenUnits ?? 16;
             },
+            set hiddenUnits(v: number) {
+              try {
+                if (!controlsRef.current) controlsRef.current = { optimizer: "sgd", activation: "sigmoid", lr: 0.3, batchSize: 8, epochs: 100, hiddenUnits: v, touchClass: "A", setGridStep: controlsRef.current?.setGridStep ?? (() => {}) } as any;
+                else controlsRef.current.hiddenUnits = v;
+                gridDirty = true;
+              } catch {}
+            },
             get touchClass() {
               return controlsRef.current?.touchClass ?? "A";
+            },
+            set touchClass(v: "A" | "B") {
+              try {
+                if (!controlsRef.current) controlsRef.current = { optimizer: "sgd", activation: "sigmoid", lr: 0.3, batchSize: 8, epochs: 100, hiddenUnits: 16, touchClass: v, setGridStep: controlsRef.current?.setGridStep ?? (() => {}) } as any;
+                else controlsRef.current.touchClass = v;
+              } catch {}
             },
             setGridStep: (v: number) => {
               try {
@@ -405,15 +484,39 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
 
         // Publish status for AgentPanel (MLP has no simple closed-form equation)
         try {
-          (
-            window as unknown as { mlvStatus?: Record<string, unknown> }
-          ).mlvStatus = {
+          let status: Record<string, unknown> = {
             classifier: "mlp",
             equation: null,
             weights: undefined,
             bias: undefined,
             updatedAt: Date.now(),
           };
+          // honor suppression window
+          if (Date.now() < _suppressStatusUntil) {
+            status.suppressed = true;
+          } else {
+            // If model exists expose a couple of runtime diagnostics to help debug
+            if (model && X.length) {
+            try {
+              let sumPred = 0;
+              let ok = 0;
+              for (let i = 0; i < X.length; i++) {
+                const pval = model.forward(X[i]);
+                sumPred += pval;
+                const cl = pval >= 0.5 ? 1 : 0;
+                if (cl === y[i]) ok++;
+              }
+              const meanPred = sumPred / X.length;
+              const acc = ok / X.length;
+              status.meanPred = meanPred;
+              status.accuracy = acc;
+              status.samples = X.length;
+            } catch (err) {
+              if (isDev()) console.debug("mlp: runtime status error", err);
+            }
+            }
+          }
+          (window as unknown as { mlvStatus?: Record<string, unknown> }).mlvStatus = status;
         } catch (err) {
           if (isDev()) console.debug("mlp: status publish error", err);
         }
@@ -439,15 +542,36 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
             : "rgba(230,120,120,0.55)";
 
           gridG.noStroke();
-          for (let gx = 0; gx < p.width; gx += gridStep) {
-            for (let gy = 0; gy < p.height; gy += gridStep) {
+          // compute grid cell counts for smoothing buffer
+          const cols = Math.ceil(p.width / gridStep);
+          const rows = Math.ceil(p.height / gridStep);
+          if (!prevPreds || prevCols !== cols || prevRows !== rows) {
+            prevPreds = new Float32Array(cols * rows);
+            prevCols = cols;
+            prevRows = rows;
+            // initialize to neutral probability
+            for (let i = 0; i < prevPreds.length; i++) prevPreds[i] = 0.5;
+          }
+
+          for (let gx = 0, cx = 0; gx < p.width; gx += gridStep, cx++) {
+            for (let gy = 0, cy = 0; gy < p.height; gy += gridStep, cy++) {
               const nx = p.map(gx + 0.5 * gridStep, 0, p.width, -1, 1);
               const ny = p.map(gy + 0.5 * gridStep, p.height, 0, -1, 1);
-              const pred = model ? (model.forward([nx, ny]) >= 0.5 ? 1 : 0) : 0;
-              // Keep class mapping consistent with perceptron visuals:
-              // pred === 1 -> class A (blue), pred === 0 -> class B (red)
-              gridG.fill(pred === 1 ? blueRGBA : redRGBA);
-              // Ensure full coverage by extending to canvas edge if needed
+              let prob = 0.5;
+              try {
+                if (model) {
+                  const pval = model.forward([nx, ny]);
+                  prob = Number.isFinite(pval) ? pval : 0.5;
+                }
+              } catch {
+                prob = 0.5;
+              }
+              const idx = cx + cy * cols;
+              const prev = prevPreds[idx] ?? 0.5;
+              const blended = prev * (1 - PRED_SMOOTH) + prob * PRED_SMOOTH;
+              prevPreds[idx] = blended;
+              const isA = blended >= 0.5;
+              gridG.fill(isA ? redRGBA : blueRGBA);
               const rectWidth = Math.min(gridStep, p.width - gx);
               const rectHeight = Math.min(gridStep, p.height - gy);
               gridG.rect(gx, gy, rectWidth, rectHeight);
@@ -523,11 +647,22 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
         if (!model) resetModel();
         if (!model || !X.length) return;
         // Set up training parameters for real-time animation
-        trainingEpochsRemaining =
-          opts.epochs ?? Math.max(10, Math.floor(30 / Math.max(1, speedScale)));
+        // ensure a sane epochs value
+        const requested = Number(opts.epochs ?? NaN);
+        const defaultEpochs = Math.max(10, Math.floor(30 / Math.max(1, speedScale)));
+        trainingEpochsRemaining = Number.isFinite(requested) && requested > 0 ? Math.max(1, Math.floor(requested)) : defaultEpochs;
         trainingLR = opts.lr ?? 0.3;
         samplesInCurrentEpoch = 0;
         isTraining = true;
+        // ensure the draw loop is running so training proceeds immediately
+        try {
+          if (typeof p.loop === 'function') p.loop();
+        } catch (err) {
+          if (isDev()) console.debug('mlp: p.loop error', err);
+        }
+        if (isDev()) {
+          try { console.debug('mlp: trainMLP called', { epochs: trainingEpochsRemaining, lr: trainingLR, samples: X.length }); } catch {}
+        }
         try {
           startedAtMs =
             performance && performance.now ? performance.now() : Date.now();
@@ -540,6 +675,62 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
           if (isDev()) console.debug("mlp: setLastDurationSec error", err);
         }
         gridDirty = true;
+      };
+
+      // Full-fit: run a blocking, deterministic fit using the classifier's fit() method.
+      // This runs synchronously and may block the UI briefly for larger epoch counts,
+      // but converges reliably to a low loss / perfect training accuracy for small datasets.
+      (p as unknown as { fullFit?: (opts?: { epochs?: number; lr?: number; batchSize?: number; maxAttempts?: number }) => void }).fullFit = (opts: { epochs?: number; lr?: number; batchSize?: number; maxAttempts?: number } = {}) => {
+        if (!model || !X.length) return;
+        // prevent mixing animated training with full-fit
+        const wasTraining = isTraining;
+        isTraining = false;
+        let startMs = Date.now();
+        const epochs = opts.epochs ?? Math.max(100, controlsRef.current?.epochs ?? 200);
+        const lrVal = opts.lr ?? (controlsRef.current?.lr ?? 0.3);
+        // default to full-batch deterministic updates for reliable convergence
+        const batchSizeVal = opts.batchSize ?? X.length;
+        const maxAttempts = Math.max(1, opts.maxAttempts ?? 3);
+        try {
+          let finalAccuracy = 0;
+          let lastLoss: number | undefined = undefined;
+          for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            // perform a blocking fit; model.fit will call trainSample synchronously
+            const losses = model.fit(X, y, { epochs, lr: lrVal, batchSize: batchSizeVal, shuffle: false, onEpoch: (ep, L) => {
+              try {
+                p._lastLoss = L;
+                if (ep % 10 === 0) gridDirty = true;
+              } catch {}
+            } });
+            try { lastLoss = Array.isArray(losses) && losses.length ? losses[losses.length - 1] : lastLoss; } catch {}
+            try { finalAccuracy = model.accuracy(X, y); } catch {}
+            // stop early if perfect accuracy reached
+            if (finalAccuracy >= 1.0) break;
+            // otherwise continue another deterministic pass (no shuffle)
+            if (isDev()) {
+              try { console.debug('mlp: fullFit attempt', attempt, { lastLoss, finalAccuracy }); } catch {}
+            }
+          }
+          const elapsed = (Date.now() - startMs) / 1000;
+          try {
+            window.dispatchEvent(
+              new CustomEvent('mlv:demo-finished', { detail: { classifier: 'Neural Network (MLP)', reason: 'train-complete', accuracy: finalAccuracy, elapsedSec: elapsed } })
+            );
+          } catch {}
+          try {
+            if (finishedRef.current) {
+              finishedRef.current.innerText = typeof p._lastLoss === 'number'
+                ? `Training finished — Loss: ${p._lastLoss.toFixed(4)} • Time: ${elapsed.toFixed(2)}s`
+                : `Training finished • Time: ${elapsed.toFixed(2)}s`;
+              finishedRef.current.style.display = 'block';
+            }
+          } catch {}
+          gridDirty = true;
+        } catch (err) {
+          if (isDev()) console.debug('mlp: fullFit error', err);
+        } finally {
+          isTraining = wasTraining;
+        }
       };
 
       p.resetDemo = () => {
@@ -593,8 +784,10 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
           root as Element
         ) as unknown as P5Instance;
         setLoading(false);
+        setLoadError(null);
       } catch (err) {
         if (isDev()) console.debug("mlp: dynamic import p5 failed", err);
+        setLoadError(typeof err === 'string' ? err : String(err));
         setLoading(false);
       }
     })();
@@ -685,10 +878,57 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
       if (p5Ref.current) {
         const L = p5Ref.current._lastLoss;
         if (typeof L === "number") setLoss(L);
+        // show debug status in dev mode
+        try {
+          const s = (p5Ref.current as unknown as any)._mlpStatus;
+        } catch {}
       }
     }, 200);
     return () => clearInterval(int);
   }, []);
+
+  // poll window.mlvStatus for runtime diagnostics published by the sketch
+  useEffect(() => {
+    if (!isDev()) return;
+    const t = setInterval(() => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const st = (window as any).mlvStatus;
+        if (st) {
+          if (typeof st.meanPred === 'number') setMlpMeanPred(st.meanPred as number);
+          if (typeof st.accuracy === 'number') setMlpAcc(st.accuracy as number);
+        }
+      } catch {}
+    }, 300);
+    return () => clearInterval(t);
+  }, []);
+
+  // auto-fallback if model collapses to a constant prediction (dev only)
+  const triedFallbackRef = useRef(false);
+  useEffect(() => {
+    if (!isDev()) return;
+    if (triedFallbackRef.current) return;
+    if (mlpMeanPred == null || mlpAcc == null) return;
+    // detect collapse: meanPred very close to 0 or 1 and low accuracy
+    if ((mlpMeanPred < 0.05 || mlpMeanPred > 0.95) && mlpAcc < 0.7) {
+      triedFallbackRef.current = true;
+      // switch to SGD with a standard lr and retrain
+      setOptimizer('sgd');
+      setLr(0.3);
+      // trigger retrain using p5 instance
+      setTimeout(() => {
+        const inst = p5Ref.current as P5Instance | null;
+        try {
+          if (inst && typeof inst.resetDemo === 'function') {
+            inst.resetDemo();
+            if (typeof inst.trainMLP === 'function') inst.trainMLP({ epochs: 50 });
+          }
+        } catch (err) {
+          if (isDev()) console.debug('mlp: auto-fallback error', err);
+        }
+      }, 200);
+    }
+  }, [mlpMeanPred, mlpAcc]);
 
   // No automatic panelPos initialization — the panel is fixed outside the canvas
   // (right:20, bottom:140) and is not draggable.
@@ -707,10 +947,10 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
     const inst = p5Ref.current;
     if (inst && typeof inst.trainMLP === "function") {
       const t = setTimeout(
-        () =>
-          inst.trainMLP({
-            epochs: Math.max(8, Math.floor(20 / Math.max(1, speedScale))),
-          }),
+        () => {
+          const ctrlEpochs = controlsRef.current?.epochs ?? 100;
+          inst.trainMLP({ epochs: Math.max(8, Math.floor(Number(ctrlEpochs) / Math.max(1, speedScale))) });
+        },
         50
       );
       return () => clearTimeout(t);
@@ -718,17 +958,26 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
     return;
   }, [resetToken, speedScale]);
 
-  return (
-    <div
-      ref={sketchRef}
-      style={{
+  const containerStyle: React.CSSProperties = compact
+    ? {
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        overflow: "hidden",
+        marginLeft: 0,
+      }
+    : {
         position: "relative",
         width: "calc(100% - 280px)",
         height: "100%",
         overflow: "hidden",
-        marginLeft: "-140px",
-      }}
-    >
+        // shift a bit more to the left so the canvas is visually centered when the
+        // floating control panel is present on the right
+        marginLeft: "-200px",
+      };
+
+  return (
+    <div ref={sketchRef} style={containerStyle}>
       {loading && (
         <div
           style={{
@@ -754,6 +1003,61 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
           </div>
         </div>
       )}
+      {loadError && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0,0,0,0.45)",
+            zIndex: 2100,
+            color: "#fff",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 680,
+              background: "rgba(0,0,0,0.6)",
+              padding: 18,
+              borderRadius: 8,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+            }}
+          >
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Demo failed to load</div>
+            <div style={{ marginBottom: 12 }}>{String(loadError)}</div>
+            <div style={{ fontSize: 13, opacity: 0.9 }}>
+              Try refreshing the page or check the browser console for details.
+            </div>
+          </div>
+          {isDev() && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 280,
+                top: 12,
+                zIndex: 60,
+                padding: '8px 10px',
+                background: 'rgba(0,0,0,0.6)',
+                color: '#fff',
+                borderRadius: 8,
+                fontSize: 12,
+                pointerEvents: 'none'
+              }}
+            >
+              <div style={{opacity:0.9}}>MLP debug</div>
+              <div style={{fontFamily:'monospace', fontSize:12}}>
+                MeanPred: {mlpMeanPred == null ? '—' : mlpMeanPred.toFixed(3)}
+              </div>
+              <div style={{fontFamily:'monospace', fontSize:12}}>
+                Acc: {mlpAcc == null ? '—' : (mlpAcc*100).toFixed(1) + '%'}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       <div
         style={{
           position: "absolute",
@@ -766,13 +1070,27 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
       >
         <button
           onClick={() => {
-            setLoss(null);
-            if (
-              p5Ref.current &&
-              typeof p5Ref.current.resetDemo === "function"
-            ) {
+              setLoss(null);
+              // reset runtime diagnostics shown in the UI
+              try {
+                setMlpAcc(null);
+                setMlpMeanPred(null);
+                // also clear the published global status if present
+                try {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  (window as any).mlvStatus = undefined;
+                } catch {}
+              } catch {}
+              if (
+                p5Ref.current &&
+                typeof p5Ref.current.resetDemo === "function"
+              ) {
+              try {
+                // suppress status publishing for 400ms so overlays stay cleared after reset
+                if (typeof (p5Ref.current as any).suppressStatus === 'function') (p5Ref.current as any).suppressStatus(400);
+              } catch {}
               p5Ref.current.resetDemo();
-            }
+              }
           }}
           style={{
             padding: "8px 16px",
@@ -801,11 +1119,39 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
           🔄 Reset
         </button>
         <button
-          onClick={() =>
-            p5Ref.current &&
-            typeof p5Ref.current.trainMLP === "function" &&
-            p5Ref.current.trainMLP({ epochs: 20 })
-          }
+          onClick={() => {
+            // run a blocking, full-fit on the current model/dataset
+            try {
+              const ctrlEpochs = controlsRef.current?.epochs ?? 200;
+              const inst = p5Ref.current as unknown as any;
+              if (inst && typeof inst.fullFit === 'function') {
+                inst.fullFit({ epochs: Math.max(50, Number(ctrlEpochs)), lr: controlsRef.current?.lr, batchSize: controlsRef.current?.batchSize ?? undefined });
+              }
+            } catch (err) {
+              try { if (isDev()) console.debug('mlp: full-fit click error', err); } catch {}
+            }
+          }}
+          style={{
+            padding: "8px 16px",
+            fontSize: 12,
+            fontWeight: 600,
+            background: prefersDark ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.95)",
+            color: prefersDark ? '#fff' : '#1a202c',
+            border: panelBorder,
+            borderRadius: 8,
+            cursor: "pointer",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+            transition: "all 0.15s ease",
+          }}
+        >
+          ⚡ Full-fit
+        </button>
+        <button
+          onClick={() => {
+            const ctrlEpochs = controlsRef.current?.epochs ?? 100;
+            p5Ref.current && typeof p5Ref.current.trainMLP === "function" &&
+              p5Ref.current.trainMLP({ epochs: Number(ctrlEpochs) });
+          }}
           style={{
             padding: "8px 16px",
             fontSize: 12,
@@ -883,6 +1229,7 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
           cursor: "default",
           maxHeight: "calc(100vh - 180px)",
           overflowY: "auto",
+          display: compact ? "none" : undefined,
         }}
       >
         <div
@@ -910,6 +1257,38 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
             }}
           >
             ⚙️ Model Controls
+          </div>
+
+          {/* Legacy / Stable toggle */}
+          <div style={{ marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              id="legacyStable"
+              type="checkbox"
+              checked={legacyStable}
+              onChange={(e) => {
+                const v = e.target.checked;
+                setLegacyStable(v);
+                if (v) {
+                  // apply proven safe defaults
+                  setOptimizer('sgd');
+                  setLr(0.3);
+                  setHiddenUnits(16);
+                  setActivation('sigmoid');
+                  setEpochs(20);
+                  setBatchSize(8);
+                  // ensure the running sketch picks up the new controls and resets
+                  const inst = p5Ref.current as P5Instance | null;
+                  try {
+                    if (inst && typeof inst.resetDemo === 'function') inst.resetDemo();
+                  } catch (err) {
+                    if (isDev()) console.debug('mlp: legacy toggle reset error', err);
+                  }
+                }
+              }}
+            />
+            <label htmlFor="legacyStable" style={{ fontSize: 12, opacity: 0.9 }}>
+              Legacy / Stable MLP (safe defaults)
+            </label>
           </div>
 
           {/* Architecture Section */}

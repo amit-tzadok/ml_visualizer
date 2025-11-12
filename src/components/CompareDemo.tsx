@@ -92,9 +92,20 @@ const CompareDemo: React.FC<CompareDemoProps> = ({
     };
     // Use a unique key that includes resetToken to force remount when needed
     const uniqueKey = `${key}-${resetToken}`;
-    if (type === "knn") return <KnnDemo key={uniqueKey} {...commonProps} />;
-    if (type === "mlp") return <MlpDemo key={uniqueKey} {...commonProps} />;
-    return <PerceptronDemo key={uniqueKey} classifierType={type} {...commonProps} />;
+  if (type === "knn") {
+    // KNN is not supported inside the side-by-side compare view. Fall back to a
+    // perceptron visualization and show a small badge explaining the fallback.
+    return (
+      <div style={{ width: "100%", height: "100%", position: "relative" }} key={uniqueKey}>
+        <PerceptronDemo classifierType={"linear"} {...commonProps} />
+        <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(0,0,0,0.6)", color: "#fff", padding: "6px 8px", borderRadius: 6, fontSize: 12 }}>
+          KNN disabled in compare mode — showing Perceptron instead
+        </div>
+      </div>
+    );
+  }
+  if (type === "mlp") return <MlpDemo key={uniqueKey} compact={true} {...commonProps} />;
+  return <PerceptronDemo key={uniqueKey} classifierType={type} {...commonProps} />;
   };
 
   return (

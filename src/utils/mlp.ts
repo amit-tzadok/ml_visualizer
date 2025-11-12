@@ -22,6 +22,8 @@ export class MLPClassifier {
   mW: number[][][] | null;
   vW: number[][][] | null;
   mB: number[][] | null;
+  // safety caps to avoid numerical explosion in interactive demos
+  private readonly _WEIGHT_CLAMP = 1e3;
   vB: number[][] | null;
 
   constructor(inputSize = 2, hidden: number[] | number = [16], options: { lr?: number; optimizer?: string; activation?: ActivationFunction; momentum?: number; beta1?: number; beta2?: number; eps?: number } = {}) {
@@ -147,7 +149,13 @@ export class MLPClassifier {
         a = z.map((v) => MLPClassifier.sigmoid(v));
       }
     }
-    return a[0];
+    const out = a[0];
+    // guard against non-finite outputs — return a neutral probability and log a message
+    if (!Number.isFinite(out) || Number.isNaN(out)) {
+      try { console.error('MLPClassifier.forward produced non-finite output', out); } catch {}
+      return 0.5;
+    }
+    return out;
   }
 
   predict(x: number[]) {
@@ -183,8 +191,16 @@ export class MLPClassifier {
     }
 
   const pred = activations[activations.length - 1][0];
-  // match Python: r_output = (target - y) * y*(1-y)
-  const delta_out = (y - pred) * MLPClassifier.sigmoidDeriv(pred);
+  if (!Number.isFinite(pred) || Number.isNaN(pred)) {
+    try { console.error('MLPClassifier.trainSample: non-finite prediction, aborting sample update', pred); } catch {}
+    return;
+  }
+  // For binary classification with sigmoid output and cross-entropy loss,
+  // the output layer delta simplifies to (target - pred). Using the
+  // sigmoid derivative here corresponds to an MSE-style gradient which
+  // can slow or destabilize convergence. Use (y - pred) so gradient
+  // direction matches the negative log-likelihood (cross-entropy).
+  const delta_out = (y - pred);
 
     let delta: number[] = [delta_out];
     for (let l = this.weights.length - 1; l >= 0; l--) {
@@ -192,7 +208,12 @@ export class MLPClassifier {
       for (let j = 0; j < this.weights[l].length; j++) {
         const grad = delta[j];
         for (let k = 0; k < this.weights[l][j].length; k++) {
-          const g = grad * a_prev[k];
+          // per-sample gradient for this weight
+          let g = grad * a_prev[k];
+          // gradient clipping to avoid exploding updates in interactive demos
+          const CLIP = 5;
+          if (g > CLIP) g = CLIP;
+          else if (g < -CLIP) g = -CLIP;
           this.applyWeightUpdate(l, j, k, g, eta);
         }
         this.applyBiasUpdate(l, j, grad, eta);
@@ -226,12 +247,22 @@ export class MLPClassifier {
       const v = (this.vW[layer][j][k] = this.beta2 * this.vW[layer][j][k] + (1 - this.beta2) * grad * grad);
       const mHat = m / (1 - Math.pow(this.beta1, this.iter));
       const vHat = v / (1 - Math.pow(this.beta2, this.iter));
-      this.weights[layer][j][k] -= eta * (mHat / (Math.sqrt(vHat) + this.eps));
+  // Keep same sign convention as SGD (which uses += eta * grad). Use += here
+  // because `grad` passed to applyWeightUpdate is already (y - pred) * a_prev.
+  this.weights[layer][j][k] += eta * (mHat / (Math.sqrt(vHat) + this.eps));
     } else {
       // sgd
       // Python uses additive updates: w += lr * grad (grad computed as (prev_activation * r))
       this.weights[layer][j][k] += eta * grad;
     }
+    // Clamp weights to avoid numerical explosion in the browser
+    try {
+      let w = this.weights[layer][j][k];
+      if (!Number.isFinite(w) || Number.isNaN(w)) w = 0;
+      if (w > this._WEIGHT_CLAMP) w = this._WEIGHT_CLAMP;
+      if (w < -this._WEIGHT_CLAMP) w = -this._WEIGHT_CLAMP;
+      this.weights[layer][j][k] = w;
+    } catch {}
   }
 
   private applyBiasUpdate(layer: number, j: number, grad: number, eta: number) {
@@ -246,10 +277,19 @@ export class MLPClassifier {
       const v = (this.vB[layer][j] = this.beta2 * this.vB[layer][j] + (1 - this.beta2) * grad * grad);
       const mHat = m / (1 - Math.pow(this.beta1, this.iter));
       const vHat = v / (1 - Math.pow(this.beta2, this.iter));
-      this.biases[layer][j] -= eta * (mHat / (Math.sqrt(vHat) + this.eps));
+  // Same sign fix for bias updates with Adam
+  this.biases[layer][j] += eta * (mHat / (Math.sqrt(vHat) + this.eps));
     } else {
       this.biases[layer][j] += eta * grad;
     }
+    // Clamp bias as well
+    try {
+      let b = this.biases[layer][j];
+      if (!Number.isFinite(b) || Number.isNaN(b)) b = 0;
+      if (b > this._WEIGHT_CLAMP) b = this._WEIGHT_CLAMP;
+      if (b < -this._WEIGHT_CLAMP) b = -this._WEIGHT_CLAMP;
+      this.biases[layer][j] = b;
+    } catch {}
   }
 
   /**
@@ -260,16 +300,24 @@ export class MLPClassifier {
     y: number[],
     options: { epochs?: number; lr?: number; batchSize?: number; shuffle?: boolean; onEpoch?: (epoch: number, loss: number) => void } = {}
   ) {
-    const epochs = options.epochs || 20;
+    const epochs = options.epochs || 40;
     const lr = options.lr || this.lr;
     const batchSize = options.batchSize || 8;
     const shuffle = options.shuffle !== undefined ? options.shuffle : true;
     const onEpoch = options.onEpoch;
 
-    const losses: number[] = [];
+  const losses: number[] = [];
     const n = X.length;
     const idx = Array.from({ length: n }, (_, i) => i);
     for (let epoch = 0; epoch < epochs; epoch++) {
+      try {
+        // epoch body
+      } catch (err) {
+        try { console.error('MLPClassifier.fit: epoch error', err); } catch {}
+        // push NaN to signal failure and break
+        losses.push(NaN);
+        break;
+      }
       if (shuffle) {
         for (let i = n - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));

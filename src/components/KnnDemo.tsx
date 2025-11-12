@@ -478,7 +478,7 @@ const KNNDemo: React.FC<KnnProps> = ({
         width: "calc(100% - 280px)",
         height: "92%",
         overflow: "hidden",
-        marginLeft: "-200px",
+        marginLeft: "-240px",
         paddingRight: "20px", // Add padding between canvas and right panel
       }}
     >
