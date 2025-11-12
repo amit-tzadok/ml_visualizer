@@ -24,6 +24,26 @@ export default class PolynomialPerceptron {
     return this.model.predict(features as number[]);
   }
 
+  /** Raw (pre-activation) score for a polynomial-transformed input. */
+  predictRaw(rawV: [number, number]) {
+    const features = this.transform(rawV);
+    // Underlying perceptron exposes predictRaw; delegate for consistency.
+    if (typeof (this.model as any).predictRaw === "function") {
+      return (this.model as any).predictRaw(features as number[]);
+    }
+    // Fallback manual dot product if ever missing.
+    let score = this.biasTerm();
+    for (let i = 0; i < this.model.weights.length; i++) {
+      score += this.model.weights[i] * (features as number[])[i];
+    }
+    return score;
+  }
+
+  /** Helper to access current bias for raw-score fallback. */
+  private biasTerm() {
+    return this.model.bias;
+  }
+
   trainSample(rawV: [number, number], label: number) {
     const features = this.transform(rawV);
     return this.model.trainSample(features as number[], label);

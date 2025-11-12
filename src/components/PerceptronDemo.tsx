@@ -409,6 +409,7 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
             .forEach((c) => c.remove());
         }
         const rect = sketchRef.current?.getBoundingClientRect();
+        // Reverted: use full container size; external layout provides spacing from bottom panel.
         const w = Math.max(300, rect?.width || 600);
         const h = Math.max(300, rect?.height || 600);
         p.createCanvas(w, h);
@@ -914,58 +915,88 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
             performance && performance.now ? performance.now() : Date.now();
           return notifiedDone && finishedAtMs && now - finishedAtMs < 500; // 0.5s grace
         };
-        p.background(isDark ? 30 : 255);
+        // Darken canvas a bit (light was 250 -> 240, dark 48 -> 42) to avoid pale look
+        // Further darken (light 240 -> 232, dark 42 -> 38) per latest feedback
+        p.background(isDark ? 38 : 232);
 
         if (classifierType === "poly") {
-          // Grid-based fill for non-linear boundaries
-          // During celebration grace, keep coarse grid to avoid heavy recompute immediately
+          // Reintroduced organic dot background with hex-like offset.
+          // Uses prediction confidence (raw score) to modulate opacity for depth.
           const inGrace = celebrateGrace();
           gridStep = paused && !inGrace ? fineGridStep : coarseGridStep;
-          gridFreq = paused && !inGrace ? 60 : 18;
+          gridFreq = paused && !inGrace ? 40 : 18; // slower refresh during training
           if (!gridG)
             gridG = p.createGraphics
               ? (p.createGraphics(p.width, p.height) as unknown as P5Graphics)
               : null;
           if (wasPaused !== paused) {
             wasPaused = paused;
-            // Avoid clearing immediately on finish; let existing grid persist under confetti
-            if (!inGrace)
+            if (!inGrace) {
               try {
                 gridG.clear();
-              } catch (err) {
-                if (
-                  typeof globalThis.process !== "undefined" &&
-                  (globalThis.process as any).env &&
-                  (globalThis.process as any).env.NODE_ENV !== "production"
-                )
-                  console.debug("perceptron: grid clear error", err);
-              }
+              } catch {}
+            }
           }
           if (
             !inGrace &&
             (p.frameCount % gridFreq === 0 || wasPaused !== paused)
           ) {
             gridG.clear();
-            const step = Math.max(2, gridStep);
             gridG.noStroke();
-            for (let px = 0; px < p.width; px += step) {
-              for (let py = 0; py < p.height; py += step) {
-                const vx = p.map(px + step / 2, 0, p.width, -1, 1);
-                const vy = p.map(py + step / 2, p.height, 0, -1, 1);
-                const pred = safePredict([vx, vy]);
-                // Subtle translucent fills: A (red), B (blue)
+            const step = Math.max(3, gridStep);
+            const dotDia = Math.max(2, Math.floor(step * 0.9));
+            for (let py = 0; py < p.height; py += step) {
+              const row = Math.floor(py / step);
+              const xOffset = row % 2 === 1 ? step / 2 : 0;
+              for (let px = -xOffset; px < p.width; px += step) {
+                const cx = px + xOffset + step / 2;
+                const cy = py + step / 2;
+                if (cx < 0 || cx > p.width || cy < 0 || cy > p.height) continue;
+                const vx = p.map(cx, 0, p.width, -1, 1);
+                const vy = p.map(cy, p.height, 0, -1, 1);
+                // Obtain raw score for confidence; fallback manual compute if adapter lacks predictRaw
+                let raw = 0;
+                try {
+                  raw = safePredictRaw([vx, vy]);
+                } catch {
+                  raw = 0;
+                }
+                if (raw === 0) {
+                  // Fallback manual polynomial score if predictRaw returned default (adapter missing method earlier)
+                  try {
+                    const w = (model && model.weights) || [];
+                    const b = (model && model.bias) || 0;
+                    if (w.length >= 5) {
+                      raw =
+                        b +
+                        w[0] * vx +
+                        w[1] * vy +
+                        w[2] * vx * vx +
+                        w[3] * vy * vy +
+                        w[4] * vx * vy;
+                    }
+                  } catch {
+                    /* ignore manual raw fallback errors */
+                  }
+                }
+                // Use discrete prediction for color to avoid all-red bug when raw was always >= 0
+                const pred01 = safePredict([vx, vy]);
+                const predSigned = pred01 === 1 ? 1 : -1;
+                // Confidence magnitude for alpha (squash via tanh for stability)
+                const conf = Math.min(1, Math.abs(raw));
+                const confAdj = Math.tanh(conf * 0.8); // smoother ramp
+                const alpha =
+                  (isDark ? 0.3 : 0.34) + confAdj * (isDark ? 0.15 : 0.18);
                 gridG.fill(
-                  pred === 1
+                  predSigned === 1
                     ? isDark
-                      ? "rgba(255,100,100,0.25)"
-                      : "rgba(255,220,220,0.35)"
+                      ? `rgba(235,70,70,${alpha.toFixed(3)})`
+                      : `rgba(230,120,120,${alpha.toFixed(3)})`
                     : isDark
-                    ? "rgba(80,150,255,0.25)"
-                    : "rgba(200,230,255,0.35)"
+                    ? `rgba(50,110,210,${alpha.toFixed(3)})`
+                    : `rgba(110,170,230,${alpha.toFixed(3)})`
                 );
-                const rectWidth = Math.min(step, p.width - px);
-                const rectHeight = Math.min(step, p.height - py);
-                gridG.rect(px, py, rectWidth, rectHeight);
+                gridG.ellipse(cx, cy, dotDia, dotDia);
               }
             }
           }
@@ -977,12 +1008,13 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
               ? (p.createGraphics(p.width, p.height) as unknown as P5Graphics)
               : null;
           // classA (A/red) & classB (B/blue) with subtle translucency
+          // Darker linear decision region palette
           const classA = isDark
-            ? "rgba(255,100,100,0.25)"
-            : "rgba(255,220,220,0.35)";
+            ? "rgba(235,70,70,0.35)"
+            : "rgba(230,120,120,0.40)";
           const classB = isDark
-            ? "rgba(80,150,255,0.25)"
-            : "rgba(200,230,255,0.35)";
+            ? "rgba(50,110,210,0.35)"
+            : "rgba(110,170,230,0.40)";
           const inGrace = celebrateGrace();
           // Keep coarse fill during grace to avoid a full-width repaint in the finish frame
           const colStep = paused && !inGrace ? 1 : 2; // finer when fully paused, coarse during grace
