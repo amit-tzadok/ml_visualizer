@@ -119,7 +119,8 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
       let finishedAtMs = 0;
       // Track training start time for elapsed duration
       let startedAtMs: number | null = null;
-      const MAX_EPOCHS = 1000;
+  const MAX_EPOCHS = 300;
+  const FAST_TRAIN_THRESHOLD = 150; // if dataset larger than this, use fast batch training
 
       const createRawModel = () =>
         (classifierType === "poly"
@@ -280,6 +281,45 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
           X.push([vx, vy]);
           y.push(labelSigned === 1 ? 1 : 0);
         }
+        // If dataset is large, run a fast batch training pass to compute a separator quickly
+        try {
+          if (
+            classifierType === "linear" &&
+            X.length > FAST_TRAIN_THRESHOLD &&
+            (model && (model.raw as any) && typeof (model.raw as any).fitFast === "function")
+          ) {
+            // epochs scaled by speed (higher speed -> fewer epochs shown), but keep a minimum
+            const fastEpochs = Math.max(20, Math.round(60 / Math.max(0.1, speed)));
+            (model.raw as any).fitFast(X, y, { epochs: fastEpochs, shuffle: true });
+            // freeze UI to reflect trained model immediately
+            paused = true;
+            notifiedDone = true;
+            // publish status
+            try {
+              const eq = getCurrentEquation();
+              window.mlvStatus = {
+                classifier: classifierType,
+                equation: eq,
+                weights: model.weights,
+                bias: model.bias,
+                updatedAt: Date.now(),
+              };
+              window.dispatchEvent(
+                new CustomEvent("mlv:demo-finished", {
+                  detail: {
+                    classifier: classifierType,
+                    reason: "fast-trained",
+                    elapsedSec: 0,
+                  },
+                })
+              );
+            } catch (err) {
+              if (isDev()) console.debug("perceptron: fast-train publish error", err);
+            }
+          }
+        } catch (err) {
+          if (isDev()) console.debug("perceptron: fast-train error", err);
+        }
         try {
           startedAtMs =
             performance && performance.now ? performance.now() : Date.now();
@@ -295,6 +335,38 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
             (globalThis.process as any).env.NODE_ENV !== "production"
           )
             console.debug("perceptron: finishedRef hide error", err);
+        }
+        // If dataset is large, perform a fast batch training pass
+        try {
+          if (
+            classifierType === "linear" &&
+            X.length > FAST_TRAIN_THRESHOLD &&
+            (model && (model.raw as any) && typeof (model.raw as any).fitFast === "function")
+          ) {
+            const fastEpochs = Math.max(20, Math.round(60 / Math.max(0.1, speed)));
+            (model.raw as any).fitFast(X, y, { epochs: fastEpochs, shuffle: true });
+            paused = true;
+            notifiedDone = true;
+            try {
+              const eq = getCurrentEquation();
+              window.mlvStatus = {
+                classifier: classifierType,
+                equation: eq,
+                weights: model.weights,
+                bias: model.bias,
+                updatedAt: Date.now(),
+              };
+              window.dispatchEvent(
+                new CustomEvent("mlv:demo-finished", {
+                  detail: { classifier: classifierType, reason: "fast-trained", elapsedSec: 0 },
+                })
+              );
+            } catch (err) {
+              if (isDev()) console.debug("perceptron: fast-train publish error", err);
+            }
+          }
+        } catch (err) {
+          if (isDev()) console.debug("perceptron: fast-train error", err);
         }
       };
 

@@ -246,7 +246,7 @@ export default class Perceptron {
 
     // Cleanup pass: on separable data, try a few extra deterministic epochs to remove remaining mistakes
     // This reduces stochastic flakiness without changing API behavior.
-  const extraEpochs = 100;
+  const extraEpochs = 10;
     for (let e = 0; e < extraEpochs; e++) {
       let mistakes = 0;
       for (let i = 0; i < X.length; i++) {
