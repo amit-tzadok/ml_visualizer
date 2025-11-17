@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",
-    "express": "^4.21.2",
+    "express": "^5.1.0",
     "katex": "^0.16.23",
     "p5": "^2.0.5",
     "react": "^19.1.1",
