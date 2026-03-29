@@ -1,7 +1,5 @@
-'use strict';
-
 /**
- * /api/chat — LLM-powered ML assistant endpoint.
+ * /api/chat — LLM-powered ML assistant endpoint (ESM, Vercel Serverless Function).
  *
  * POST body:
  *   { message: string, ragContext?: string, appState?: { classifier, compare, speedScale, accuracy, epoch } }
@@ -12,9 +10,11 @@
  *   503  { error: 'LLM not configured', code: 'NO_API_KEY' }  ← frontend falls back gracefully
  *   502  { error: 'LLM request failed' }
  *
- * The ANTHROPIC_API_KEY env var must be set (Vercel secret or .env locally).
+ * The ANTHROPIC_API_KEY env var must be set in Vercel project settings.
  * The key is NEVER sent to the client.
  */
+
+import Anthropic from '@anthropic-ai/sdk';
 
 const SYSTEM_PROMPT_BASE = `\
 You are an ML education assistant embedded inside ML Visualizer — an interactive \
@@ -44,7 +44,7 @@ Guidelines:
 • Never invent features the app doesn't have.
 • Use plain notation (e.g. w·x + b) without LaTeX delimiters.`;
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -57,7 +57,6 @@ module.exports = async (req, res) => {
   // ── API key guard ────────────────────────────────────────────────────────
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    // Signal to the client to fall back to the rule-based system
     return res.status(503).json({ error: 'LLM not configured', code: 'NO_API_KEY' });
   }
 
@@ -96,9 +95,6 @@ module.exports = async (req, res) => {
 
   // ── Call Claude Haiku ────────────────────────────────────────────────────
   try {
-    // Require inside the function so the module still loads when the SDK is
-    // not installed (server returns 503 instead of crashing).
-    const { default: Anthropic } = require('@anthropic-ai/sdk');
     const client = new Anthropic({ apiKey });
 
     const msg = await client.messages.create({
@@ -119,4 +115,4 @@ module.exports = async (req, res) => {
     console.error('[chat] LLM request failed:', detail);
     return res.status(502).json({ error: 'LLM request failed', detail });
   }
-};
+}

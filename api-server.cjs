@@ -3,22 +3,19 @@
 /**
  * Local development server for API endpoints
  * Simulates Vercel's serverless functions locally
- * 
+ *
  * Usage: node api-server.cjs
  */
 
 const express = require('express');
 const questionsHandler = require('./api/questions.cjs');
-const chatHandler = require('./api/chat.cjs');
 
 const app = express();
 const PORT = 3001;
 
-// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Simple request/response wrapper to match Vercel's serverless function signature
 function wrapHandler(handler) {
   return async (req, res) => {
     try {
@@ -37,15 +34,21 @@ app.post('/api/questions', wrapHandler(questionsHandler));
 app.get('/api/questions', wrapHandler(questionsHandler));
 app.options('/api/questions', wrapHandler(questionsHandler));
 
-app.post('/api/chat', wrapHandler(chatHandler));
-app.options('/api/chat', wrapHandler(chatHandler));
+// chat.js is ESM — load via dynamic import inside handler
+app.post('/api/chat', async (req, res) => {
+  const { default: chatHandler } = await import('./api/chat.js');
+  await wrapHandler(chatHandler)(req, res);
+});
+app.options('/api/chat', async (req, res) => {
+  const { default: chatHandler } = await import('./api/chat.js');
+  await wrapHandler(chatHandler)(req, res);
+});
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Start server
 app.listen(PORT, () => {
   console.log(`✅ API server running on http://localhost:${PORT}`);
   console.log(`   Endpoints:`);

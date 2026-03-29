@@ -1,0 +1,12 @@
+# Local-only API files that use native modules (better-sqlite3)
+# which cannot compile in Vercel's Lambda environment.
+# Only api/chat.js and api/embeddings.js are deployed to Vercel.
+api/db.cjs
+api/questions.cjs
+api/questions.db
+
+# Local dev server — not a serverless function
+api-server.cjs
+
+# Scripts
+scripts/
