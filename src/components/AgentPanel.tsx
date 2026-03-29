@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import styles from './AgentPanel.module.css';
 import { chunkText, buildIndex, queryIndex, DocChunk } from '../utils/rag';
 
@@ -392,9 +393,11 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
                 style={!msg.isUser ? { background: botBubbleBg, color: botBubbleColor, borderColor } : undefined}
               >
                 <div className={styles.messageText}>
-                  {msg.text.split('\n').map((line, i) => (
-                    <div key={i}>{line || <br />}</div>
-                  ))}
+                  {msg.isUser ? (
+                    msg.text
+                  ) : (
+                    <ReactMarkdown>{msg.text}</ReactMarkdown>
+                  )}
                 </div>
                 <div className={styles.messageTime}>
                   {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

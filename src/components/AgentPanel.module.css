@@ -196,3 +196,36 @@
 .typingDot:nth-child(3) {
   animation-delay: 0.4s;
 }
+
+/* ── Markdown rendering inside bot bubbles ── */
+.messageText p {
+  margin: 0 0 8px 0;
+}
+.messageText p:last-child {
+  margin-bottom: 0;
+}
+.messageText h1,
+.messageText h2,
+.messageText h3 {
+  margin: 8px 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.messageText ul,
+.messageText ol {
+  margin: 4px 0 8px;
+  padding-left: 18px;
+}
+.messageText li {
+  margin-bottom: 2px;
+}
+.messageText strong {
+  font-weight: 700;
+}
+.messageText code {
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
