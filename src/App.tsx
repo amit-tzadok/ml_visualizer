@@ -4,6 +4,8 @@ const PerceptronDemo = React.lazy(() => import("./components/PerceptronDemo"));
 const CompareDemo = React.lazy(() => import("./components/CompareDemo"));
 const KnnDemo = React.lazy(() => import("./components/KnnDemo"));
 const MlpDemo = React.lazy(() => import("./components/MlpDemo"));
+const LogisticRegressionDemo = React.lazy(() => import("./components/LogisticRegressionDemo"));
+const DecisionTreeDemo = React.lazy(() => import("./components/DecisionTreeDemo"));
 const Welcome = React.lazy(() => import("./components/Welcome"));
 const AgentPanel = React.lazy(() => import("./components/AgentPanel"));
 const InfoModal = React.lazy(() => import("./components/InfoModal"));
@@ -563,6 +565,36 @@ const App: React.FC = () => {
                   speedScale={speedScale}
                 />
               </div>
+            ) : classifier === "logreg" ? (
+              <div
+                style={{
+                  width: "96%",
+                  height: "96%",
+                  maxWidth: 1400,
+                  maxHeight: 1200,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflowY: "auto",
+                }}
+              >
+                <LogisticRegressionDemo key={runKey} speedScale={speedScale} />
+              </div>
+            ) : classifier === "dtree" ? (
+              <div
+                style={{
+                  width: "96%",
+                  height: "96%",
+                  maxWidth: 1400,
+                  maxHeight: 1200,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflowY: "auto",
+                }}
+              >
+                <DecisionTreeDemo key={runKey} speedScale={speedScale} />
+              </div>
             ) : (
               <div
                 style={{
@@ -635,9 +667,8 @@ const App: React.FC = () => {
               value={classifier}
               onChange={(e) => {
                 const v = e.target.value;
-                // If the user chooses KNN while in compare mode, exit compare mode
-                // and switch to the standalone KNN demo. Bump runKey to force remount.
-                if (v === "knn" && compare) {
+                // Exit compare mode for classifiers that don't support it
+                if ((v === "knn" || v === "logreg" || v === "dtree") && compare) {
                   setCompare(false);
                   setClassifier(v);
                   _setRunKey((k) => k + 1);
@@ -673,6 +704,8 @@ const App: React.FC = () => {
               <option value="poly">Polynomial Perceptron</option>
               <option value="mlp">Neural Network (MLP)</option>
               <option value="knn">K-Nearest Neighbors</option>
+              <option value="logreg">Logistic Regression</option>
+              <option value="dtree">Decision Tree</option>
             </select>
           </label>
 

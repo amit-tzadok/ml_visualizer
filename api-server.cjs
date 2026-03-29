@@ -9,6 +9,7 @@
 
 const express = require('express');
 const questionsHandler = require('./api/questions.cjs');
+const chatHandler = require('./api/chat.cjs');
 
 const app = express();
 const PORT = 3001;
@@ -36,6 +37,9 @@ app.post('/api/questions', wrapHandler(questionsHandler));
 app.get('/api/questions', wrapHandler(questionsHandler));
 app.options('/api/questions', wrapHandler(questionsHandler));
 
+app.post('/api/chat', wrapHandler(chatHandler));
+app.options('/api/chat', wrapHandler(chatHandler));
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -47,6 +51,7 @@ app.listen(PORT, () => {
   console.log(`   Endpoints:`);
   console.log(`   - POST /api/questions (save question)`);
   console.log(`   - GET  /api/questions (retrieve questions)`);
+  console.log(`   - POST /api/chat      (LLM assistant — requires ANTHROPIC_API_KEY)`);
   console.log(`   - GET  /api/health (health check)`);
   console.log(``);
   console.log(`💡 Run "npm run dev" in another terminal to start the Vite dev server`);

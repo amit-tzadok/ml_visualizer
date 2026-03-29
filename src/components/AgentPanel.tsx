@@ -23,9 +23,192 @@ interface Message {
   text: string;
   isUser: boolean;
   timestamp: Date;
-  // optional provenance snippets returned by the RAG index
-  sources?: DocChunk[] & { score?: number }[];
+  sources?: (DocChunk & { score?: number })[];
+  isTyping?: boolean;
 }
+
+// ── Rule-based fallback ───────────────────────────────────────────────────────
+
+function getClassifierInfo(type: string) {
+  const info: Record<string, {
+    description: string;
+    strengths: string[];
+    weaknesses: string[];
+    useCases: string[];
+  }> = {
+    linear: {
+      description: 'A linear perceptron that finds a straight line to separate data into two classes.',
+      strengths: ['Simple and fast', 'Works well with linearly separable data', 'Easy to interpret'],
+      weaknesses: ['Cannot model curved boundaries', 'Sensitive to outliers', 'Underfits nonlinear patterns'],
+      useCases: ['Linearly separable data', 'Baseline comparison', 'Teaching the perceptron update rule'],
+    },
+    poly: {
+      description: 'A polynomial perceptron with degree-2 feature expansion: [x, y, x², y², xy].',
+      strengths: ['Handles curved decision boundaries', 'Simple extension of linear', 'No extra tuning for degree'],
+      weaknesses: ['Fixed degree (2)', 'Feature space grows fast at higher degrees', 'Can overfit small datasets'],
+      useCases: ['Circular or elliptic patterns', 'Non-linear 2D classification', 'Feature engineering demo'],
+    },
+    mlp: {
+      description: 'A Multi-Layer Perceptron (neural network) with configurable hidden layers, activations, and optimisers.',
+      strengths: ['Very flexible — learns any decision boundary', 'Multiple activations & optimisers', 'Handles spirals, moons, XOR'],
+      weaknesses: ['Requires tuning (layers, LR, epochs)', 'Slower to train', 'Less interpretable'],
+      useCases: ['Complex nonlinear patterns', 'Deep learning demonstration', 'Showing Adam vs SGD'],
+    },
+    knn: {
+      description: 'K-Nearest Neighbors: classifies by majority vote of the k closest training points.',
+      strengths: ['No training phase', 'Intuitive — directly uses the data', 'Non-parametric'],
+      weaknesses: ['Slow prediction on large datasets (O(n))', 'Sensitive to noisy neighbours', 'k must be tuned'],
+      useCases: ['Instance-based learning', 'Small datasets', 'Understanding distance-based classification'],
+    },
+    logreg: {
+      description: 'Logistic Regression: P(y=1|x) = σ(w·x + b). Trained with mini-batch gradient descent and L2 regularisation.',
+      strengths: ['Smooth differentiable boundary', 'Outputs calibrated probabilities', 'Regularisation prevents overfitting'],
+      weaknesses: ['Still linear decision boundary', 'Cannot separate XOR, moons, spirals'],
+      useCases: ['Binary classification with probability output', 'Seeing gradient descent live', 'Comparing to perceptron'],
+    },
+    dtree: {
+      description: 'Decision Tree (CART): grows axis-aligned splits by maximising Gini information gain at each node.',
+      strengths: ['Interpretable', 'Handles XOR and moons with enough depth', 'No feature scaling needed'],
+      weaknesses: ['Overfits easily at high depth', 'Axis-aligned splits only (no diagonal)', 'Unstable — small data changes shift splits'],
+      useCases: ['Nonlinear classification', 'Visualising bias-variance tradeoff', 'Showing overfitting vs underfitting'],
+    },
+  };
+  return info[type] ?? {
+    description: 'An ML classifier in the visualizer.',
+    strengths: [], weaknesses: [], useCases: [],
+  };
+}
+
+function formatInfo(type: string): string {
+  const { description, strengths, weaknesses, useCases } = getClassifierInfo(type);
+  const title = type === 'logreg' ? 'LOGISTIC REGRESSION'
+    : type === 'dtree' ? 'DECISION TREE'
+    : type.toUpperCase();
+  return [
+    `**${title}**`,
+    description,
+    '',
+    'Strengths:',
+    ...strengths.map(s => `• ${s}`),
+    '',
+    'Limitations:',
+    ...weaknesses.map(w => `• ${w}`),
+    '',
+    'Best for:',
+    ...useCases.map(u => `• ${u}`),
+  ].join('\n');
+}
+
+function generateFallbackResponse(userInput: string, classifier: string, compare: boolean, speedScale: number): string {
+  const q = userInput.toLowerCase().trim();
+
+  if (q.includes('equation') || q.includes('formula') || q.includes('boundary')) {
+    if (compare) return 'In Compare mode there are two classifiers running — turn it off to get the current equation.';
+    if (classifier === 'linear' || classifier === 'poly') {
+      const s = (window as unknown as { mlvStatus?: { classifier?: string; equation?: string | null } }).mlvStatus;
+      if (s?.classifier === classifier && s.equation) return `Current decision boundary:\n${s.equation}`;
+      return 'Train the model first, then ask again — I\'ll show the live equation.';
+    }
+    if (classifier === 'mlp') return 'The MLP has no closed-form equation — it\'s a composition of learned nonlinear layers.';
+    if (classifier === 'knn') return 'KNN has no equation; it classifies by the labels of the k nearest neighbours.';
+    if (classifier === 'logreg') return 'Logistic regression boundary: w₀x + w₁y + b = 0, equivalently y = −(w₀/w₁)x − b/w₁ (the dashed line on the canvas).';
+    if (classifier === 'dtree') return 'Decision trees use a series of axis-aligned rules, not a single equation. Watch the partition lines animate — each one is one split.';
+  }
+
+  const classifierTypes = ['linear', 'poly', 'mlp', 'knn', 'logreg', 'dtree'];
+  if (q.includes('what') && (q.includes('classifier') || q.includes('algorithm') || q.includes('model'))) {
+    const mentioned = classifierTypes.find(t =>
+      q.includes(t) ||
+      (t === 'linear' && q.includes('perceptron')) ||
+      (t === 'poly' && q.includes('polynomial')) ||
+      (t === 'mlp' && (q.includes('neural') || q.includes('network'))) ||
+      (t === 'knn' && q.includes('nearest')) ||
+      (t === 'logreg' && q.includes('logistic')) ||
+      (t === 'dtree' && (q.includes('decision') || q.includes('tree')))
+    );
+    return formatInfo(mentioned ?? classifier);
+  }
+
+  if (q.includes('advantage') || q.includes('strength') || q.includes('pro') ||
+      q.includes('disadvantage') || q.includes('weakness') || q.includes('con') ||
+      q.includes('limitation') || q.includes('tradeoff') || q.includes('trade-off')) {
+    const mentioned = classifierTypes.find(t =>
+      q.includes(t) ||
+      (t === 'linear' && q.includes('perceptron')) ||
+      (t === 'poly' && q.includes('polynomial')) ||
+      (t === 'mlp' && (q.includes('neural') || q.includes('network'))) ||
+      (t === 'knn' && q.includes('nearest')) ||
+      (t === 'logreg' && q.includes('logistic')) ||
+      (t === 'dtree' && (q.includes('decision') || q.includes('tree')))
+    );
+    return formatInfo(mentioned ?? classifier);
+  }
+
+  if (q.includes('speed') || q.includes('slow') || q.includes('fast')) {
+    return `Current speed: ${speedScale}x. Adjust with the slider in the bottom bar. Try 0.5× to watch individual updates, or 3× to race to convergence.`;
+  }
+
+  if (q.includes('compare')) {
+    return `Compare mode shows two classifiers side-by-side on the same dataset. ${compare ? 'It\'s on now.' : 'Toggle it in the bottom bar.'} Supports Linear, Poly, and MLP.`;
+  }
+
+  if (q.includes('data') || q.includes('point') || q.includes('click') || q.includes('add')) {
+    return 'Left-click the canvas for class A (red), right-click for class B (blue). On touch devices, use the Touch tap selector in the controls.';
+  }
+
+  if (q.includes('dataset') || q.includes('xor') || q.includes('moon') || q.includes('circle') || q.includes('spiral') || q.includes('blob')) {
+    return 'Logistic Regression and Decision Tree have preset dataset buttons: Blobs (easy), Moons, Circles, XOR, and Spirals. Spirals are the hardest — only a deep tree or MLP can learn them.';
+  }
+
+  if (q.includes('status') || q.includes('current') || q.includes('state')) {
+    return `Current: classifier=${classifier.toUpperCase()}, compare=${compare ? 'on' : 'off'}, speed=${speedScale}×.`;
+  }
+
+  if (q.includes('hello') || q.includes('hi') || q.includes('hey')) {
+    return 'Hello! Ask me anything about the algorithms, controls, or the maths behind what you see.';
+  }
+
+  if (q.includes('thank')) {
+    return 'Happy learning!';
+  }
+
+  return 'I can explain any classifier (Linear, Poly, MLP, KNN, Logistic Regression, Decision Tree), describe controls, or walk through the maths. What would you like to know?';
+}
+
+// ── LLM call ─────────────────────────────────────────────────────────────────
+
+interface AppState {
+  classifier: string;
+  compare: boolean;
+  speedScale: number;
+  accuracy?: number | null;
+  epoch?: number | null;
+}
+
+async function callLLM(
+  message: string,
+  ragContext: string,
+  appState: AppState
+): Promise<string | null> {
+  const res = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, ragContext, appState }),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+    // 503 with NO_API_KEY means the key isn't set — fall back silently
+    if (res.status === 503 && body.code === 'NO_API_KEY') return null;
+    throw new Error(`HTTP ${res.status}`);
+  }
+
+  const data = await res.json() as { response?: string };
+  return typeof data.response === 'string' ? data.response : null;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 const AgentPanel: React.FC<AgentPanelProps> = ({
   classifier,
@@ -37,354 +220,195 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
-      text: "Hello! I'm your local ML Assistant. I can help you understand machine learning concepts, explain classifiers, and provide tips for using the visualizer. What would you like to know?",
+      text: "Hello! I'm your ML Assistant. Ask me about any algorithm, the maths behind it, or how to use the visualizer.",
       isUser: false,
       timestamp: new Date(),
     },
   ]);
   const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const indexRef = useRef<ReturnType<typeof buildIndex> | null>(null);
-  const [indexReady, setIndexReady] = useState<boolean>(false);
-  const [useRag, setUseRag] = useState<boolean>(false);
-  const [sessionId] = useState<string>(() => {
-    // Generate a unique session ID for this chat session
-    return `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  });
-  // runtime helper to detect dev environment without using `any` casts
+  const [indexReady, setIndexReady] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`);
+
   const isDev = () => {
     try {
-      const proc = (globalThis as unknown as { process?: { env?: { NODE_ENV?: string } } }).process;
-      return !!(proc && proc.env && proc.env.NODE_ENV !== 'production');
-    } catch {
-      return false;
-    }
+      const p = (globalThis as unknown as { process?: { env?: { NODE_ENV?: string } } }).process;
+      return !!(p?.env?.NODE_ENV !== 'production');
+    } catch { return false; }
   };
 
+  // Build TF-IDF index from assistant context doc
   useEffect(() => {
-    // Load a canned assistant context from the public docs folder and build a TF-IDF index
     const load = async () => {
       try {
         const res = await fetch('/docs/assistant_context.md');
         if (!res.ok) throw new Error('no docs');
         const md = await res.text();
-        const chunks = chunkText(md, 'assistant_context');
-        indexRef.current = buildIndex(chunks);
+        indexRef.current = buildIndex(chunkText(md, 'assistant_context'));
         setIndexReady(true);
       } catch (err) {
-        // silently ignore; index will remain unavailable
         indexRef.current = null;
-        setIndexReady(false);
-        if (isDev()) console.debug('agentpanel: load index error', err);
+        if (isDev()) console.debug('agentpanel: index load failed', err);
       }
     };
     load();
   }, []);
 
-  const getClassifierInfo = (type: string) => {
-    const info: { [key: string]: { description: string; strengths: string[]; weaknesses: string[]; useCases: string[] } } = {
-      linear: {
-        description: "A linear perceptron that finds a straight line to separate data points into two classes.",
-        strengths: ["Simple and fast", "Works well with linearly separable data", "Easy to understand"],
-        weaknesses: ["Cannot model curved/complex boundaries", "Sensitive to outliers", "Underfits non-linear patterns"],
-        useCases: ["Binary classification", "Well-separated data", "Educational purposes"],
-      },
-      poly: {
-        description: "A polynomial perceptron that can learn curved decision boundaries using polynomial features.",
-        strengths: ["Can handle non-linear data", "More flexible than linear", "Still relatively simple"],
-        weaknesses: ["Feature explosion with high degrees", "Prone to overfitting without regularization", "Choice of degree is manual"],
-        useCases: ["Non-linear classification", "Curved decision boundaries", "Moderate complexity data"],
-      },
-      mlp: {
-        description: "A Multi-Layer Perceptron (neural network) with configurable hidden layers and neurons.",
-        strengths: ["Very flexible", "Can learn complex patterns", "Modern deep learning approach"],
-        weaknesses: ["Needs tuning (layers, lr, epochs)", "Slower to train", "Less interpretable"],
-        useCases: ["Complex classification", "Pattern recognition", "Advanced ML demonstrations"],
-      },
-      knn: {
-        description: "K-Nearest Neighbors algorithm that classifies points based on their closest neighbors.",
-        strengths: ["No training phase", "Intuitive", "Non-parametric"],
-        weaknesses: ["Prediction slows with many points", "Sensitive to feature scaling & noise", "Choice of K affects bias/variance"],
-        useCases: ["Instance-based learning", "Small datasets", "Understanding distance-based classification"],
-      },
-    };
-    return info[type] || { description: "Unknown classifier", strengths: [], weaknesses: [], useCases: [] };
-  };
+  // Auto-scroll to latest message
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-  const formatInfo = (type: string) => {
-    const info = getClassifierInfo(type);
-    const title = type.toUpperCase();
-    const strengths = info.strengths.map((s) => `• ${s}`).join('\n');
-    const weaknesses = info.weaknesses.map((w) => `• ${w}`).join('\n');
-    const uses = info.useCases.map((u) => `• ${u}`).join('\n');
-    return `**${title}**\n${info.description}\n\nStrengths:\n${strengths}\n\nLimitations:\n${weaknesses}\n\nBest for:\n${uses}`;
-  };
-
-  const generateResponse = (userInput: string): string => {
-    const input = userInput.toLowerCase().trim();
-
-    // Final equation request
-    if (input.includes('equation') || input.includes('formula') || input.includes('boundary')) {
-      if (compare) {
-        return "In Compare mode there are two classifiers at once, so I can’t show a single equation. Turn off Compare to get the current classifier’s equation.";
-      }
-      try {
-  const status = (window as unknown as { mlvStatus?: { classifier?: string; equation?: string | null; updatedAt?: number } }).mlvStatus;
-        if (classifier === 'linear' || classifier === 'poly') {
-          if (status && status.classifier === classifier && status.equation) {
-            return `Current ${classifier.toUpperCase()} decision boundary:\n${status.equation}`;
-          }
-          return classifier === 'linear'
-            ? "I’ll show the line equation once the model has trained a bit. Try pausing the demo (Space) to freeze the final weights."
-            : "I’ll show the polynomial boundary once the model has trained a bit. Try pausing the demo (Space).";
-        }
-        if (classifier === 'mlp') {
-          return "The MLP doesn’t have a simple closed-form equation. It’s a composition of learned nonlinear layers. I can summarize its architecture or last loss if you’d like.";
-        }
-        if (classifier === 'knn') {
-          return "KNN has no equation—it classifies by the labels of the nearest neighbors in the dataset.";
-        }
-      } catch (err) {
-        // fall through to default
-        if (isDev()) console.debug('agentpanel: status probe error', err);
-      }
-    }
-
-    // Classifier questions
-    if (input.includes('what') && input.includes('classifier')) {
-      return formatInfo(classifier);
-    }
-
-    // Pros/Cons / Advantages/Disadvantages
-    if (
-      input.includes('advantage') || input.includes('advantages') ||
-      input.includes('pro') || input.includes('pros') ||
-      input.includes('disadvantage') || input.includes('disadvantages') ||
-      input.includes('con') || input.includes('cons') ||
-      input.includes('tradeoff') || input.includes('trade-offs') || input.includes('limitations')
-    ) {
-      // If user mentions a specific classifier, use it; else use current
-      const types = ['linear','poly','mlp','knn'];
-      const mentioned = types.find(t => input.includes(t) || (t==='linear' && input.includes('perceptron')) || (t==='poly' && input.includes('polynomial')) || (t==='mlp' && input.includes('neural')) || (t==='knn' && input.includes('nearest')));
-      return formatInfo(mentioned || classifier);
-    }
-
-    if (input.includes('explain') || input.includes('what is')) {
-      if (input.includes('linear') || input.includes('perceptron')) {
-        return "The Linear Perceptron is the simplest form of a neural network. It tries to find a straight line that best separates your data points. Think of it as drawing a line to divide red points from blue points. It's great for data that's already somewhat separated, but struggles with complex patterns.";
-      }
-      if (input.includes('polynomial') || input.includes('poly')) {
-        return "The Polynomial Perceptron extends the linear version by adding curved features. Instead of just a straight line, it can create curved decision boundaries. This helps when your data forms curved patterns that a straight line can't separate well.";
-      }
-      if (input.includes('mlp') || input.includes('neural') || input.includes('network')) {
-        return "The Multi-Layer Perceptron (MLP) is a modern neural network with multiple layers of neurons. It can learn very complex patterns and is the foundation of deep learning. You can adjust the number of hidden layers and neurons to control its complexity.";
-      }
-      if (input.includes('knn') || input.includes('nearest')) {
-        return "The K-Nearest Neighbors (KNN) algorithm is different - it doesn't 'learn' in the traditional sense. When you want to classify a new point, it looks at the K closest points in your training data and votes on the most common class. It's simple but effective for understanding distance-based classification.";
-      }
-    }
-
-    // Speed and controls
-    if (input.includes('speed') || input.includes('slow') || input.includes('fast')) {
-      return `Current speed is ${speedScale}x. You can adjust this using the speed slider in the bottom-left. Higher speeds make animations faster but might be harder to follow. Try 0.5x for detailed observation or 2x for quick demonstrations.`;
-    }
-
-    // Compare mode
-    if (input.includes('compare')) {
-      return `Compare mode lets you see two classifiers side-by-side. ${compare ? "It's currently enabled" : "It's currently disabled"}. When enabled, you'll see both algorithms working simultaneously on the same data. This is great for understanding the differences between classifiers!`;
-    }
-
-    // Data and interaction
-    if (input.includes('data') || input.includes('points') || input.includes('add')) {
-      return "To add data points: **Left-click** for Class A (red points) or **Right-click** for Class B (blue points). On touch devices, use the 'Touch tap adds' control. Try to create interesting patterns - some classifiers work better with certain data distributions!";
-    }
-
-    // Tips and suggestions
-    if (input.includes('tip') || input.includes('help') || input.includes('how')) {
-      const tips = [
-        "Try the Linear Perceptron first - it's the simplest to understand",
-        "For curved patterns, switch to Polynomial Perceptron",
-        "Use Compare mode to see how different algorithms perform on the same data",
-        "KNN works well with small, well-clustered datasets",
-        "The MLP can learn very complex patterns but might be slower",
-        "Experiment with different data patterns to see how each algorithm responds",
-      ];
-      return "💡 **Tip:** " + tips[Math.floor(Math.random() * tips.length)];
-    }
-
-    // Current state
-    if (input.includes('status') || input.includes('current') || input.includes('state')) {
-      return `**Current Status:**
-• Classifier: ${classifier.toUpperCase()}
-• Compare Mode: ${compare ? 'Enabled' : 'Disabled'}
-• Speed: ${speedScale}x
-• Theme: (custom)
-
-Ready to explore machine learning!`;
-    }
-
-    // Default responses
-    if (input.includes('hello') || input.includes('hi') || input.includes('hey')) {
-      return "Hello! I'm here to help you learn about machine learning algorithms. Ask me about classifiers, get tips, or ask for explanations!";
-    }
-
-    if (input.includes('thank')) {
-      return "You're welcome! Happy learning! 🎓";
-    }
-
-    // Fallback
-    return "I can help you with:\n• Explaining different classifiers (Linear, Polynomial, MLP, KNN)\n• Tips for using the visualizer\n• Understanding current settings\n• Guidance on adding data points\n\nTry asking 'explain linear perceptron' or 'give me a tip'!";
-
-  };
-
-  /**
-   * Save user question to the database
-   * @param question - The user's question text
-   */
-  const saveQuestionToDB = async (question: string): Promise<void> => {
+  const saveQuestionToDB = async (question: string) => {
     try {
-      const response = await fetch('/api/questions', {
+      await fetch('/api/questions', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          question,
-          classifier,
-          compareMode: compare,
-          speedScale,
-          sessionId,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, classifier, compareMode: compare, speedScale, sessionId }),
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (isDev()) {
-        console.debug('Question saved:', data);
-      }
-    } catch (error) {
-      // Silently fail - don't disrupt user experience
-      if (isDev()) {
-        console.debug('Failed to save question to database:', error);
-      }
+    } catch (err) {
+      if (isDev()) console.debug('agentpanel: DB save failed', err);
     }
   };
 
-  const handleSendMessage = () => {
-    if (!inputValue.trim()) return;
+  const handleSendMessage = async () => {
+    const text = inputValue.trim();
+    if (!text || isLoading) return;
+    setInputValue('');
 
-    const userMessage: Message = {
-      id: messages.length + 1,
-      text: inputValue,
-      isUser: true,
-      timestamp: new Date(),
-    };
+    const userMsg: Message = { id: Date.now(), text, isUser: true, timestamp: new Date() };
+    setMessages(prev => [...prev, userMsg]);
 
-    // Save question to database (async, non-blocking)
-    saveQuestionToDB(inputValue).catch((err) => {
-      if (isDev()) console.debug('agentpanel: failed to save question', err);
-    });
+    // Save to DB (non-blocking)
+    saveQuestionToDB(text).catch(() => {});
 
-    // Query the TF-IDF index for relevant snippets (if available)
-    let sources: (DocChunk & { score?: number })[] | undefined = undefined;
+    setIsLoading(true);
+
+    // ── Build RAG context ──────────────────────────────────────────────────
+    let ragContext = '';
+    let sources: (DocChunk & { score?: number })[] | undefined;
     try {
       if (indexRef.current) {
-        const hits = queryIndex(indexRef.current, inputValue, 3);
-        // attach score where available
-        sources = hits.map((h) => ({ ...(h as (DocChunk & { score?: number })) }));
+        const hits = queryIndex(indexRef.current, text, 3);
+        sources = hits as (DocChunk & { score?: number })[];
+        ragContext = hits.map(h => h.text).join('\n\n---\n\n');
       }
     } catch (err) {
-      sources = undefined;
-      if (isDev()) console.debug('agentpanel: queryIndex error', err);
+      if (isDev()) console.debug('agentpanel: RAG query failed', err);
     }
 
-    const botResponse: Message = {
-      id: messages.length + 2,
-      text: generateResponse(inputValue),
+    // ── Get live training state ────────────────────────────────────────────
+    const mlvStatus = (window as unknown as { mlvStatus?: Record<string, unknown> }).mlvStatus;
+    const appState: AppState = {
+      classifier,
+      compare,
+      speedScale,
+      accuracy: typeof mlvStatus?.accuracy === 'number' ? mlvStatus.accuracy : null,
+      epoch: typeof mlvStatus?.epoch === 'number' ? mlvStatus.epoch : null,
+    };
+
+    // ── Try LLM, fall back to rule-based ───────────────────────────────────
+    let responseText: string;
+    try {
+      const llmResponse = await callLLM(text, ragContext, appState);
+      responseText = llmResponse ?? generateFallbackResponse(text, classifier, compare, speedScale);
+    } catch (err) {
+      if (isDev()) console.debug('agentpanel: LLM call error', err);
+      responseText = generateFallbackResponse(text, classifier, compare, speedScale);
+    }
+
+    setIsLoading(false);
+    const botMsg: Message = {
+      id: Date.now() + 1,
+      text: responseText,
       isUser: false,
       timestamp: new Date(),
       sources,
     };
-    // If RAG toggle is enabled, inject retrieved snippets into the displayed prompt
-    if (useRag && sources && sources.length) {
-      const header = ['Retrieved context (top results):'];
-      for (const s of sources) {
-        header.push(`- ${s.source} (${s.id}) — ${ (s.text || '').slice(0, 180).replace(/\n/g, ' ') }${(s.text || '').length > 180 ? '…' : ''}`);
-      }
-      botResponse.text = `${header.join('\n')}
-\n${botResponse.text}`;
-    }
-
-    setMessages(prev => [...prev, userMessage, botResponse]);
-    setInputValue('');
+    setMessages(prev => [...prev, botMsg]);
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
   };
 
-  if (!isOpen) {
-    return null; // Don't render anything when closed
-  }
+  if (!isOpen) return null;
 
   return (
-    <div className={`${styles.agentSidebar} ${isOpen ? styles.open : ''}`}>
+    <div className={`${styles.agentSidebar} ${styles.open}`}>
       <div className={styles.agentHeader}>
-        <h3>ML Assistant</h3>
-        <button
-          onClick={onClose}
-          className={styles.closeButton}
-          title="Close Assistant"
-        >
-          ✕
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h3 style={{ margin: 0 }}>ML Assistant</h3>
+          {indexReady && (
+            <span style={{
+              fontSize: 10,
+              background: '#c6f6d5',
+              color: '#276749',
+              padding: '2px 6px',
+              borderRadius: 4,
+              fontWeight: 600,
+            }}>
+              RAG ready
+            </span>
+          )}
+        </div>
+        <button onClick={onClose} className={styles.closeButton} title="Close Assistant">✕</button>
       </div>
+
       <div className={styles.agentContent}>
         <div className={styles.chatContainer}>
           <div className={styles.messages}>
-            {messages.map((message) => (
+            {messages.map((msg) => (
               <div
-                key={message.id}
-                className={`${styles.message} ${message.isUser ? styles.userMessage : styles.botMessage}`}
+                key={msg.id}
+                className={`${styles.message} ${msg.isUser ? styles.userMessage : styles.botMessage}`}
               >
                 <div className={styles.messageText}>
-                  {message.text.split('\n').map((line, i) => (
-                    <div key={i}>{line}</div>
+                  {msg.text.split('\n').map((line, i) => (
+                    <div key={i}>{line || <br />}</div>
                   ))}
                 </div>
                 <div className={styles.messageTime}>
-                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
               </div>
             ))}
+
+            {/* Typing indicator */}
+            {isLoading && (
+              <div className={`${styles.message} ${styles.botMessage}`}>
+                <div className={styles.messageText} style={{ opacity: 0.6, fontStyle: 'italic' }}>
+                  Thinking…
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
           </div>
+
           <div className={styles.inputContainer}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}>
-                <input type="checkbox" checked={useRag} onChange={(e) => setUseRag(e.target.checked)} />
-                <span>Include retrieved context</span>
-              </label>
-              <span style={{ fontSize: 10, opacity: 0.7 }}>({indexReady ? 'index ready' : 'unavailable'})</span>
-            </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <input
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Ask me about ML, classifiers..."
+                onKeyDown={handleKeyDown}
+                placeholder="Ask about any algorithm…"
                 className={styles.chatInput}
+                disabled={isLoading}
               />
               <button
                 onClick={handleSendMessage}
                 className={styles.sendButton}
+                disabled={isLoading || !inputValue.trim()}
               >
-                Send
+                {isLoading ? '…' : 'Send'}
               </button>
             </div>
           </div>

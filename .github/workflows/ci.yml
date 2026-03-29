@@ -46,8 +46,8 @@ jobs:
         env:
           NODE_OPTIONS: --max_old_space_size=4096
 
-      - name: Run tests (Vitest)
-        run: npm test --silent
+      - name: Run tests with coverage (Vitest)
+        run: npm run test:coverage --silent
         env:
           CI: true
 
