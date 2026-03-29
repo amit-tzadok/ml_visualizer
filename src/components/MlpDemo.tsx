@@ -669,44 +669,20 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
         for (const pt of points) {
           const px = p.map(pt.x, -1, 1, 0, p.width);
           const py = p.map(pt.y, -1, 1, p.height, 0);
-          p.fill(pt.label === "A" ? "#e53e3e" : "#4299e1");
+          const ptColor = pt.label === "A" ? "#f43f5e" : "#06b6d4"; // rose-500 vs cyan-500
+          p.drawingContext.shadowBlur = 12;
+          p.drawingContext.shadowColor = ptColor;
+          p.fill(ptColor);
           p.noStroke();
           p.circle(px, py, 12);
+          p.drawingContext.shadowBlur = 0;
         }
       };
 
-      p.mousePressed = () => {
-        if (!p5Ref.current) return;
-        if (
-          p.mouseX < 0 ||
-          p.mouseY < 0 ||
-          p.mouseX > p.width ||
-          p.mouseY > p.height
-        )
-          return;
-        const mx = p.map(p.mouseX, 0, p.width, -1, 1);
-        const my = p.map(p.mouseY, p.height, 0, -1, 1);
-        // on touch devices use selected touchClass; p.touches exists when touching
-        let label = "A";
-        try {
-          const isTouch = p.touches && p.touches.length > 0;
-          if (isTouch) {
-            label = p._mlpControls?.touchClass ?? "A";
-          } else {
-            label = p.mouseButton === p.LEFT ? "A" : "B";
-          }
-        } catch {
-          // Ignore touch detection errors
-          label = p.mouseButton === p.LEFT ? "A" : "B";
-        }
-        points.push({ x: mx, y: my, label });
-        X.push([mx, my]);
-        y.push(label === "A" ? 1 : 0);
-        gridDirty = true;
-        if (onDatasetChange)
-          onDatasetChange((d: Point[] = []) => [...d, { x: mx, y: my, label }]);
-        // No automatic retrain on add (reverted)
-      };
+      // Point-adding is handled by the DOM pointerdown listener attached in setup
+      // (uses ev.button and ev.pointerType reliably). The p.mousePressed hook is a
+      // no-op to avoid double-adding points on every click.
+      p.mousePressed = () => {};
 
       p.updateDataset = (newDataset: Point[] | undefined) => {
         points = [];
@@ -1762,8 +1738,8 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
                     border: panelBorder,
                   }}
                 >
-                  <option value="A">🔴 Red</option>
-                  <option value="B">🔵 Blue</option>
+                  <option value="A">🌹 Rose (left-click)</option>
+                  <option value="B">🩵 Cyan (right-click)</option>
                 </select>
               </div>
             </div>
