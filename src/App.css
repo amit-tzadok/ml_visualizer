@@ -35,9 +35,9 @@ body {
   opacity: 0.35;
   animation: orbFloat 18s ease-in-out infinite;
 }
-.mlv-orb.orb1 { background: #7dd3fc; top: -10vmax; left: -10vmax; animation-delay: 0s; }
-.mlv-orb.orb2 { background: #67e8f9; bottom: -12vmax; right: -8vmax; animation-delay: 3s; }
-.mlv-orb.orb3 { background: #a5f3fc; top: 20%; right: 10%; animation-delay: 6s; }
+.mlv-orb.orb1 { background: #fda4af; top: -10vmax; left: -10vmax; animation-delay: 0s; }
+.mlv-orb.orb2 { background: #d8b4fe; bottom: -12vmax; right: -8vmax; animation-delay: 3s; }
+.mlv-orb.orb3 { background: #f9a8d4; top: 20%; right: 10%; animation-delay: 6s; }
 
 @keyframes orbFloat {
   0%, 100% { transform: translate(0, 0) scale(1); }
@@ -136,10 +136,10 @@ body {
 
 @keyframes buttonPulse {
   0%, 100% {
-    box-shadow: 0 10px 30px rgba(14, 165, 233, 0.4);
+    box-shadow: 0 10px 30px rgba(244, 63, 94, 0.4);
   }
   50% {
-    box-shadow: 0 10px 30px rgba(14, 165, 233, 0.6), 0 0 20px rgba(14, 165, 233, 0.3);
+    box-shadow: 0 10px 30px rgba(244, 63, 94, 0.6), 0 0 20px rgba(244, 63, 94, 0.3);
   }
 }
 
@@ -249,7 +249,7 @@ body {
 
 /* Accessible focus ring — only shown on keyboard navigation, not mouse */
 *:focus-visible {
-  outline: 2px solid #0ea5e9;
+  outline: 2px solid #f43f5e;
   outline-offset: 2px;
   border-radius: 4px;
 }
