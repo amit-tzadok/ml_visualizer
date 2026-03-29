@@ -16,9 +16,24 @@ import {
 
 type DatasetType = "blobs" | "moons" | "circles" | "xor";
 
+interface ThemeColors {
+  background: string;
+  mainBackground: string;
+  text: string;
+  headerBg: string;
+  controlBg: string;
+  pointPositive: string;
+  pointNegative: string;
+  line: string;
+  accent: string;
+  shadow: string;
+  textMuted?: string;
+}
+
 interface LogisticRegressionDemoProps {
   speedScale?: number;
   showInstructions?: boolean;
+  theme?: ThemeColors;
 }
 
 // Canvas coordinate helpers — maps [-1.3, 1.3] <-> [0, size]
@@ -42,6 +57,7 @@ function blend(c1: readonly number[], c2: readonly number[], t: number) {
 
 const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
   speedScale = 1,
+  theme,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lossCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -59,6 +75,32 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
   const [epoch, setEpoch] = useState(0);
   const [currentLoss, setCurrentLoss] = useState<number | null>(null);
   const [accuracy, setAccuracy] = useState<number | null>(null);
+
+  // Derived theme tokens — fall back to light-mode literals when no theme is provided
+  const isDark = theme?.text === "#f7fafc";
+  const T = {
+    text:        theme?.text      ?? "#2d3748",
+    subText:     theme?.textMuted ?? "#718096",
+    labelText:   isDark ? "#cbd5e0" : "#4a5568",
+    titleText:   theme?.text      ?? "#1a202c",
+    controlBg:   theme?.controlBg ?? "rgba(255,255,255,0.98)",
+    accent:      theme?.accent    ?? "#667eea",
+    shadow:      theme?.shadow    ?? "rgba(0,0,0,0.08)",
+    border:      `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "#e2e8f0"}`,
+    statsBg:     isDark ? "rgba(45,55,72,0.6)"    : "#f7fafc",
+    infoBg:      isDark ? "rgba(43,108,176,0.15)" : "#ebf4ff",
+    infoBorder:  isDark ? "1px solid rgba(102,126,234,0.3)" : "1px solid #bee3f8",
+    infoText:    theme?.accent    ?? "#2b6cb0",
+    btnBg:       theme?.controlBg ?? "#fff",
+    btnText:     theme?.text      ?? "#4a5568",
+    lossBg:      isDark ? "rgba(45,55,72,0.95)"   : "rgba(247,250,252,0.95)",
+    lossText:    isDark ? "#a0aec0" : "#4a5568",
+    lossPlaceholder: isDark ? "#718096" : "#a0aec0",
+  };
+
+  // Keep a ref to T so renderLoss (empty deps) can always read current theme
+  const themeRef = useRef(T);
+  themeRef.current = T;
 
   const generateDataset = useCallback((type: DatasetType): DataPoint[] => {
     switch (type) {
@@ -149,15 +191,16 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    const tc = themeRef.current;
     const W = canvas.width;
     const H = canvas.height;
     const losses = lossHistoryRef.current;
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = "rgba(247,250,252,0.95)";
+    ctx.fillStyle = tc.lossBg;
     ctx.fillRect(0, 0, W, H);
 
     if (losses.length < 2) {
-      ctx.fillStyle = "#a0aec0";
+      ctx.fillStyle = tc.lossPlaceholder;
       ctx.font = "12px system-ui";
       ctx.fillText("Start training to see loss curve", 16, H / 2 + 4);
       return;
@@ -188,12 +231,12 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
         H - pad.b - ((losses[i] - minL) / range) * (H - pad.t - pad.b);
       if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
     }
-    ctx.strokeStyle = "#667eea";
+    ctx.strokeStyle = tc.accent;
     ctx.lineWidth = 2;
     ctx.stroke();
 
     // Label
-    ctx.fillStyle = "#4a5568";
+    ctx.fillStyle = tc.lossText;
     ctx.font = "bold 11px system-ui";
     ctx.fillText(
       `Loss: ${losses[losses.length - 1].toFixed(4)}`,
@@ -308,6 +351,7 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
         maxWidth: 920,
         margin: "0 auto",
         alignItems: "flex-start",
+        color: T.text,
       }}
     >
       {/* ── Left column: canvas + loss curve ── */}
@@ -324,10 +368,10 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
           width={CANVAS_W}
           height={CANVAS_H}
           style={{
-            border: "1px solid #e2e8f0",
+            border: T.border,
             borderRadius: 10,
             display: "block",
-            boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+            boxShadow: `0 2px 12px ${T.shadow}`,
           }}
         />
         <div>
@@ -335,7 +379,7 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
             style={{
               fontSize: 11,
               fontWeight: 600,
-              color: "#718096",
+              color: T.subText,
               marginBottom: 3,
               letterSpacing: "0.04em",
               textTransform: "uppercase",
@@ -348,7 +392,7 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
             width={CANVAS_W}
             height={LOSS_H}
             style={{
-              border: "1px solid #e2e8f0",
+              border: T.border,
               borderRadius: 6,
               display: "block",
             }}
@@ -373,7 +417,7 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
               margin: "0 0 6px",
               fontSize: 22,
               fontWeight: 700,
-              color: "#1a202c",
+              color: T.titleText,
             }}
           >
             Logistic Regression
@@ -382,7 +426,7 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
             style={{
               margin: 0,
               fontSize: 13,
-              color: "#718096",
+              color: T.subText,
               lineHeight: 1.6,
             }}
           >
@@ -395,7 +439,7 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
         {/* Dataset selector */}
         <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
           <span
-            style={{ fontSize: 12, fontWeight: 600, color: "#4a5568" }}
+            style={{ fontSize: 12, fontWeight: 600, color: T.labelText }}
           >
             Dataset
           </span>
@@ -412,9 +456,9 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
                     borderRadius: 6,
                     border: "1px solid",
                     cursor: "pointer",
-                    background: datasetType === t ? "#667eea" : "#fff",
-                    color: datasetType === t ? "#fff" : "#4a5568",
-                    borderColor: datasetType === t ? "#667eea" : "#cbd5e0",
+                    background: datasetType === t ? T.accent : T.btnBg,
+                    color: datasetType === t ? "#fff" : T.btnText,
+                    borderColor: datasetType === t ? T.accent : (isDark ? "rgba(255,255,255,0.15)" : "#cbd5e0"),
                     transition: "all 0.15s",
                   }}
                 >
@@ -427,7 +471,7 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
 
         {/* Learning rate */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "#4a5568" }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: T.labelText }}>
             Learning Rate:{" "}
             <span style={{ fontFamily: "monospace" }}>{lr.toFixed(2)}</span>
           </label>
@@ -442,7 +486,7 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
               setLr(v);
               modelRef.current.lr = v;
             }}
-            style={{ width: "100%", accentColor: "#667eea" }}
+            style={{ width: "100%", accentColor: T.accent }}
           />
         </div>
 
@@ -457,7 +501,7 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
               borderRadius: 8,
               border: "none",
               cursor: "pointer",
-              background: isRunning ? "#e53e3e" : "#667eea",
+              background: isRunning ? "#e53e3e" : T.accent,
               color: "#fff",
               boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
               transition: "background 0.15s",
@@ -472,10 +516,10 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
               fontSize: 13,
               fontWeight: 600,
               borderRadius: 8,
-              border: "1px solid #cbd5e0",
+              border: T.border,
               cursor: "pointer",
-              background: "#fff",
-              color: "#4a5568",
+              background: T.btnBg,
+              color: T.btnText,
             }}
           >
             Step
@@ -487,10 +531,10 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
               fontSize: 13,
               fontWeight: 600,
               borderRadius: 8,
-              border: "1px solid #cbd5e0",
+              border: T.border,
               cursor: "pointer",
-              background: "#fff",
-              color: "#4a5568",
+              background: T.btnBg,
+              color: T.btnText,
             }}
           >
             Reset
@@ -501,9 +545,9 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
         <div
           style={{
             padding: "12px 14px",
-            background: "#f7fafc",
+            background: T.statsBg,
             borderRadius: 10,
-            border: "1px solid #e2e8f0",
+            border: T.border,
             display: "flex",
             flexDirection: "column",
             gap: 8,
@@ -532,8 +576,8 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
                 fontSize: 13,
               }}
             >
-              <span style={{ color: "#718096" }}>{label}</span>
-              <span style={{ fontWeight: 700, fontFamily: "monospace" }}>
+              <span style={{ color: T.subText }}>{label}</span>
+              <span style={{ fontWeight: 700, fontFamily: "monospace", color: T.text }}>
                 {value}
               </span>
             </div>
@@ -544,11 +588,11 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
         <div
           style={{
             padding: "12px 14px",
-            background: "#ebf4ff",
+            background: T.infoBg,
             borderRadius: 10,
-            border: "1px solid #bee3f8",
+            border: T.infoBorder,
             fontSize: 12,
-            color: "#2b6cb0",
+            color: T.infoText,
             lineHeight: 1.7,
           }}
         >

@@ -22,9 +22,24 @@ import {
 
 type DatasetType = "blobs" | "moons" | "circles" | "xor" | "spirals";
 
+interface ThemeColors {
+  background: string;
+  mainBackground: string;
+  text: string;
+  headerBg: string;
+  controlBg: string;
+  pointPositive: string;
+  pointNegative: string;
+  line: string;
+  accent: string;
+  shadow: string;
+  textMuted?: string;
+}
+
 interface DecisionTreeDemoProps {
   speedScale?: number;
   showInstructions?: boolean;
+  theme?: ThemeColors;
 }
 
 // Coordinate helpers: maps [-1.3, 1.3] <-> [0, canvasSize]
@@ -67,6 +82,7 @@ function generateDataset(type: DatasetType): DataPoint[] {
 
 const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
   speedScale = 1,
+  theme,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number | null>(null);
@@ -82,6 +98,26 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
   const [treeDepth, setTreeDepth] = useState(0);
   const [splitCount, setSplitCount] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+
+  // Derived theme tokens — fall back to light-mode literals when no theme is provided
+  const isDark = theme?.text === "#f7fafc";
+  const T = {
+    text:          theme?.text      ?? "#2d3748",
+    subText:       theme?.textMuted ?? "#718096",
+    labelText:     isDark ? "#cbd5e0" : "#4a5568",
+    titleText:     theme?.text      ?? "#1a202c",
+    controlBg:     theme?.controlBg ?? "rgba(255,255,255,0.98)",
+    accent:        theme?.accent    ?? "#667eea",
+    shadow:        theme?.shadow    ?? "rgba(0,0,0,0.08)",
+    border:        `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "#e2e8f0"}`,
+    statsBg:       isDark ? "rgba(45,55,72,0.6)"      : "#f7fafc",
+    insightBg:     isDark ? "rgba(39,103,73,0.2)"     : "#f0fff4",
+    insightBorder: isDark ? "1px solid rgba(154,230,180,0.3)" : "1px solid #9ae6b4",
+    insightText:   isDark ? "#68d391"                 : "#276749",
+    dimText:       isDark ? "#718096"                 : "#a0aec0",
+    btnBg:         theme?.controlBg ?? "#fff",
+    btnText:       theme?.text      ?? "#4a5568",
+  };
 
   const drawRegions = useCallback(
     (ctx: CanvasRenderingContext2D, tree: DecisionTree) => {
@@ -271,6 +307,9 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
     buildAndAnimate(maxDepth, ptsRef.current);
   };
 
+  // Suppress unused variable warnings for CLASS_COLORS (used implicitly by canvas)
+  void CLASS_COLORS;
+
   return (
     <div
       style={{
@@ -281,6 +320,7 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
         maxWidth: 920,
         margin: "0 auto",
         alignItems: "flex-start",
+        color: T.text,
       }}
     >
       {/* ── Canvas ── */}
@@ -290,10 +330,10 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
           width={CANVAS_W}
           height={CANVAS_H}
           style={{
-            border: "1px solid #e2e8f0",
+            border: T.border,
             borderRadius: 10,
             display: "block",
-            boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+            boxShadow: `0 2px 12px ${T.shadow}`,
           }}
         />
         {/* Depth colour legend */}
@@ -317,7 +357,7 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
                   borderRadius: 2,
                 }}
               />
-              <span style={{ color: "#718096" }}>depth {i}</span>
+              <span style={{ color: T.subText }}>depth {i}</span>
             </span>
           ))}
         </div>
@@ -339,12 +379,12 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
               margin: "0 0 6px",
               fontSize: 22,
               fontWeight: 700,
-              color: "#1a202c",
+              color: T.titleText,
             }}
           >
             Decision Tree
           </h2>
-          <p style={{ margin: 0, fontSize: 13, color: "#718096", lineHeight: 1.6 }}>
+          <p style={{ margin: 0, fontSize: 13, color: T.subText, lineHeight: 1.6 }}>
             CART-style tree using Gini impurity. Each split partitions the
             feature space with an axis-aligned line. Watch the splits grow depth
             by depth.
@@ -353,7 +393,7 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
 
         {/* Dataset */}
         <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#4a5568" }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: T.labelText }}>
             Dataset
           </span>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -370,9 +410,9 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
                   borderRadius: 6,
                   border: "1px solid",
                   cursor: "pointer",
-                  background: datasetType === t ? "#4a5568" : "#fff",
-                  color: datasetType === t ? "#fff" : "#4a5568",
-                  borderColor: datasetType === t ? "#4a5568" : "#cbd5e0",
+                  background: datasetType === t ? T.accent : T.btnBg,
+                  color: datasetType === t ? "#fff" : T.btnText,
+                  borderColor: datasetType === t ? T.accent : (isDark ? "rgba(255,255,255,0.15)" : "#cbd5e0"),
                   transition: "all 0.15s",
                 }}
               >
@@ -384,7 +424,7 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
 
         {/* Max depth */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "#4a5568" }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: T.labelText }}>
             Max Depth:{" "}
             <span style={{ fontFamily: "monospace" }}>{maxDepth}</span>
           </label>
@@ -395,14 +435,14 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
             step="1"
             value={maxDepth}
             onChange={(e) => handleDepthChange(Number(e.target.value))}
-            style={{ width: "100%", accentColor: "#4a5568" }}
+            style={{ width: "100%", accentColor: T.accent }}
           />
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
               fontSize: 11,
-              color: "#a0aec0",
+              color: T.dimText,
             }}
           >
             <span>shallow</span>
@@ -422,10 +462,11 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
               borderRadius: 8,
               border: "none",
               cursor: isAnimating ? "not-allowed" : "pointer",
-              background: isAnimating ? "#a0aec0" : "#4a5568",
+              background: isAnimating ? (isDark ? "#4a5568" : "#a0aec0") : T.accent,
               color: "#fff",
               boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
               transition: "background 0.15s",
+              opacity: isAnimating ? 0.7 : 1,
             }}
           >
             {isAnimating ? "Building…" : "🌲 Build Tree"}
@@ -437,10 +478,10 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
               fontSize: 13,
               fontWeight: 600,
               borderRadius: 8,
-              border: "1px solid #cbd5e0",
+              border: T.border,
               cursor: "pointer",
-              background: "#fff",
-              color: "#4a5568",
+              background: T.btnBg,
+              color: T.btnText,
             }}
           >
             Reset
@@ -451,9 +492,9 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
         <div
           style={{
             padding: "12px 14px",
-            background: "#f7fafc",
+            background: T.statsBg,
             borderRadius: 10,
-            border: "1px solid #e2e8f0",
+            border: T.border,
             display: "flex",
             flexDirection: "column",
             gap: 8,
@@ -478,8 +519,8 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
                 fontSize: 13,
               }}
             >
-              <span style={{ color: "#718096" }}>{label}</span>
-              <span style={{ fontWeight: 700, fontFamily: "monospace" }}>
+              <span style={{ color: T.subText }}>{label}</span>
+              <span style={{ fontWeight: 700, fontFamily: "monospace", color: T.text }}>
                 {String(value)}
               </span>
             </div>
@@ -490,11 +531,11 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
         <div
           style={{
             padding: "12px 14px",
-            background: "#f0fff4",
+            background: T.insightBg,
             borderRadius: 10,
-            border: "1px solid #9ae6b4",
+            border: T.insightBorder,
             fontSize: 12,
-            color: "#276749",
+            color: T.insightText,
             lineHeight: 1.7,
           }}
         >
@@ -509,7 +550,7 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
         <div
           style={{
             fontSize: 11,
-            color: "#a0aec0",
+            color: T.dimText,
             lineHeight: 1.6,
           }}
         >

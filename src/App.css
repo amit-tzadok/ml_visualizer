@@ -246,3 +246,10 @@ body {
 }
 .compare-button:hover { transform: translateY(-1px); box-shadow: 0 5px 14px rgba(0,0,0,0.15); }
 .compare-button:active { transform: translateY(0); box-shadow: 0 2px 6px rgba(0,0,0,0.10); }
+
+/* Accessible focus ring — only shown on keyboard navigation, not mouse */
+*:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+  border-radius: 4px;
+}

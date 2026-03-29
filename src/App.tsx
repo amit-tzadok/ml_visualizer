@@ -73,6 +73,7 @@ const App: React.FC = () => {
       line: "#2d3748",
       accent: "#667eea",
       shadow: "rgba(0,0,0,0.1)",
+      textMuted: "#718096",
     },
     dark: {
       background: "linear-gradient(135deg, #1a202c 0%, #2d3748 100%)",
@@ -85,6 +86,7 @@ const App: React.FC = () => {
       line: "#f7fafc",
       accent: "#63b3ed",
       shadow: "rgba(0,0,0,0.3)",
+      textMuted: "#a0aec0",
     },
   } as const;
 
@@ -578,7 +580,7 @@ const App: React.FC = () => {
                   overflowY: "auto",
                 }}
               >
-                <LogisticRegressionDemo key={runKey} speedScale={speedScale} />
+                <LogisticRegressionDemo key={runKey} speedScale={speedScale} theme={currentTheme} />
               </div>
             ) : classifier === "dtree" ? (
               <div
@@ -593,7 +595,7 @@ const App: React.FC = () => {
                   overflowY: "auto",
                 }}
               >
-                <DecisionTreeDemo key={runKey} speedScale={speedScale} />
+                <DecisionTreeDemo key={runKey} speedScale={speedScale} theme={currentTheme} />
               </div>
             ) : (
               <div

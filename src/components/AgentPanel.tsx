@@ -214,9 +214,19 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
   classifier,
   compare,
   speedScale,
+  theme,
   isOpen,
   onClose,
 }) => {
+  const isDark = theme?.text === '#f7fafc';
+  const panelBg  = theme?.controlBg  ?? 'white';
+  const headerBg = isDark ? 'rgba(45,55,72,0.98)' : '#f8fafc';
+  const borderColor = isDark ? 'rgba(255,255,255,0.10)' : '#e2e8f0';
+  const textColor   = theme?.text ?? '#1a202c';
+  const mutedText   = isDark ? '#a0aec0' : '#718096';
+  const inputBg     = isDark ? 'rgba(30,40,55,0.9)' : 'white';
+  const botBubbleBg = isDark ? 'rgba(45,55,72,0.8)' : '#f1f5f9';
+  const botBubbleColor = isDark ? '#e2e8f0' : '#334155';
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
@@ -341,15 +351,21 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className={`${styles.agentSidebar} ${styles.open}`}>
-      <div className={styles.agentHeader}>
+    <div
+      className={`${styles.agentSidebar} ${styles.open}`}
+      style={{ background: panelBg, borderLeft: `1px solid ${borderColor}` }}
+    >
+      <div
+        className={styles.agentHeader}
+        style={{ background: headerBg, borderBottom: `1px solid ${borderColor}` }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <h3 style={{ margin: 0 }}>ML Assistant</h3>
+          <h3 style={{ margin: 0, color: textColor }}>ML Assistant</h3>
           {indexReady && (
             <span style={{
               fontSize: 10,
-              background: '#c6f6d5',
-              color: '#276749',
+              background: isDark ? 'rgba(39,103,73,0.4)' : '#c6f6d5',
+              color: isDark ? '#68d391' : '#276749',
               padding: '2px 6px',
               borderRadius: 4,
               fontWeight: 600,
@@ -358,7 +374,12 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
             </span>
           )}
         </div>
-        <button onClick={onClose} className={styles.closeButton} title="Close Assistant">✕</button>
+        <button
+          onClick={onClose}
+          className={styles.closeButton}
+          title="Close Assistant"
+          style={{ color: mutedText }}
+        >✕</button>
       </div>
 
       <div className={styles.agentContent}>
@@ -368,6 +389,7 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
               <div
                 key={msg.id}
                 className={`${styles.message} ${msg.isUser ? styles.userMessage : styles.botMessage}`}
+                style={!msg.isUser ? { background: botBubbleBg, color: botBubbleColor, borderColor } : undefined}
               >
                 <div className={styles.messageText}>
                   {msg.text.split('\n').map((line, i) => (
@@ -380,11 +402,16 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
               </div>
             ))}
 
-            {/* Typing indicator */}
+            {/* Animated typing indicator */}
             {isLoading && (
-              <div className={`${styles.message} ${styles.botMessage}`}>
-                <div className={styles.messageText} style={{ opacity: 0.6, fontStyle: 'italic' }}>
-                  Thinking…
+              <div
+                className={`${styles.message} ${styles.botMessage}`}
+                style={{ background: botBubbleBg, color: botBubbleColor, borderColor }}
+              >
+                <div className={styles.typingIndicator}>
+                  <span className={styles.typingDot} />
+                  <span className={styles.typingDot} />
+                  <span className={styles.typingDot} />
                 </div>
               </div>
             )}
@@ -392,7 +419,10 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
             <div ref={messagesEndRef} />
           </div>
 
-          <div className={styles.inputContainer}>
+          <div
+            className={styles.inputContainer}
+            style={{ background: headerBg, borderTop: `1px solid ${borderColor}` }}
+          >
             <div style={{ display: 'flex', gap: 10 }}>
               <input
                 type="text"
@@ -402,6 +432,11 @@ const AgentPanel: React.FC<AgentPanelProps> = ({
                 placeholder="Ask about any algorithm…"
                 className={styles.chatInput}
                 disabled={isLoading}
+                style={{
+                  background: inputBg,
+                  color: textColor,
+                  borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#e2e8f0',
+                }}
               />
               <button
                 onClick={handleSendMessage}
