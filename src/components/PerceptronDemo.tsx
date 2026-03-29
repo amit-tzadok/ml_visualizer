@@ -987,9 +987,9 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
             performance && performance.now ? performance.now() : Date.now();
           return notifiedDone && finishedAtMs && now - finishedAtMs < 500; // 0.5s grace
         };
-        // Darken canvas a bit (light was 250 -> 240, dark 48 -> 42) to avoid pale look
-        // Further darken (light 240 -> 232, dark 42 -> 38) per latest feedback
-        p.background(isDark ? 38 : 232);
+        // Dark navy / light slate canvas background
+        if (isDark) p.background(15, 23, 42);   // #0f172a slate-950
+        else        p.background(241, 245, 249); // #f1f5f9 slate-100
 
         if (classifierType === "poly") {
           // Reintroduced organic dot background with hex-like offset.
@@ -1064,14 +1064,11 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
                 const confAdj = Math.tanh(conf * 0.8); // smoother ramp
                 const alpha =
                   (isDark ? 0.3 : 0.34) + confAdj * (isDark ? 0.15 : 0.18);
+                // rose-500 vs cyan-500
                 gridG.fill(
                   predSigned === 1
-                    ? isDark
-                      ? `rgba(235,70,70,${alpha.toFixed(3)})`
-                      : `rgba(230,120,120,${alpha.toFixed(3)})`
-                    : isDark
-                    ? `rgba(50,110,210,${alpha.toFixed(3)})`
-                    : `rgba(110,170,230,${alpha.toFixed(3)})`
+                    ? `rgba(244,63,94,${alpha.toFixed(3)})`
+                    : `rgba(6,182,212,${alpha.toFixed(3)})`
                 );
                 gridG.ellipse(cx, cy, dotDia, dotDia);
               }
@@ -1084,14 +1081,9 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
             gridG = p.createGraphics
               ? (p.createGraphics(p.width, p.height) as unknown as P5Graphics)
               : null;
-          // classA (A/red) & classB (B/blue) with subtle translucency
-          // Darker linear decision region palette
-          const classA = isDark
-            ? "rgba(235,70,70,0.35)"
-            : "rgba(230,120,120,0.40)";
-          const classB = isDark
-            ? "rgba(50,110,210,0.35)"
-            : "rgba(110,170,230,0.40)";
+          // rose-500 vs cyan-500 decision regions
+          const classA = isDark ? "rgba(244,63,94,0.42)"  : "rgba(244,63,94,0.32)";
+          const classB = isDark ? "rgba(6,182,212,0.42)"  : "rgba(6,182,212,0.32)";
           const inGrace = celebrateGrace();
           // Keep coarse fill during grace to avoid a full-width repaint in the finish frame
           const colStep = paused && !inGrace ? 1 : 2; // finer when fully paused, coarse during grace
@@ -1237,9 +1229,12 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
           notifiedDone &&
           weights.length >= 2
         ) {
-          // Neutral boundary stroke for better contrast (avoid purple hue)
-          if (isDark) p.stroke(255, 255, 255, 220);
-          else p.stroke(0, 0, 0, 220);
+          // Glowing boundary line
+          p.drawingContext.shadowBlur = 18;
+          p.drawingContext.shadowColor = "rgba(255,255,255,0.9)";
+          if (isDark) p.stroke(255, 255, 255, 230);
+          else p.stroke(30, 30, 30, 220);
+          p.strokeWeight(2.5);
           const w0 = weights[0];
           const w1 = weights[1];
           if (Math.abs(w1) > 1e-6) {
@@ -1319,20 +1314,38 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
             const xPix = p.map(xNorm, -1, 1, 0, p.width);
             p.line(xPix, 0, xPix, p.height);
           }
+          // Reset glow and stroke weight after boundary line
+          p.drawingContext.shadowBlur = 0;
+          p.strokeWeight(1);
         }
 
         for (let pt of points) {
           const px = p.map(pt.x, -1, 1, 0, p.width);
           const py = p.map(pt.y, -1, 1, p.height, 0);
           const predSigned = safePredict([pt.x, pt.y]) === 1 ? 1 : -1;
-          // Use consistent blue/red coloring: A -> red (#e53e3e), B -> blue (#4299e1)
-          p.fill(pt.labelSigned === 1 ? "#e53e3e" : "#4299e1");
-          p.stroke(0);
-          p.circle(px, py, 8);
+          const ptColor = pt.labelSigned === 1 ? "#f43f5e" : "#06b6d4"; // rose-500 vs cyan-500
+
+          // Glow halo via drawingContext shadow
+          p.drawingContext.shadowBlur = 14;
+          p.drawingContext.shadowColor = ptColor;
+
+          p.noStroke();
+          p.fill(ptColor);
+          p.circle(px, py, 11);
+
+          // White center highlight for depth
+          p.fill(255, 255, 255, 180);
+          p.circle(px, py, 3.5);
+
+          p.drawingContext.shadowBlur = 0;
+
+          // Misclassification ring
           if (predSigned !== pt.labelSigned) {
             p.noFill();
-            p.stroke(0);
-            p.circle(px, py, 12);
+            p.stroke(255, 255, 255, 200);
+            p.strokeWeight(2);
+            p.circle(px, py, 17);
+            p.strokeWeight(1);
           }
         }
 

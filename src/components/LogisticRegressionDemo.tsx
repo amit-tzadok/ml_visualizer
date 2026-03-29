@@ -44,8 +44,8 @@ const toPx = (v: number, size: number) =>
 const fromPx = (px: number, size: number) =>
   (px / size) * (2 * RANGE) - RANGE;
 
-const COLOR_A = [66, 153, 225] as const;   // class 1 — blue
-const COLOR_B = [252, 129, 129] as const;  // class 0 — red
+const COLOR_A = [6, 182, 212] as const;    // class 1 — cyan-500
+const COLOR_B = [244, 63, 94] as const;    // class 0 — rose-500
 const MAX_EPOCHS = 500;
 
 function blend(c1: readonly number[], c2: readonly number[], t: number) {
@@ -134,7 +134,7 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
               data[idx]     = r;
               data[idx + 1] = g;
               data[idx + 2] = b;
-              data[idx + 3] = 70;
+              data[idx + 3] = 100;
             }
           }
         }
@@ -152,13 +152,20 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
         const px = toPx(pt.x, W);
         const py = toPx(pt.y, H);
         const [r, g, b] = pt.label === 1 ? COLOR_A : COLOR_B;
+        const pointColor = `rgb(${r},${g},${b})`;
+
+        ctx.shadowBlur = 14;
+        ctx.shadowColor = pointColor;
+
         ctx.beginPath();
-        ctx.arc(px, py, 5, 0, Math.PI * 2);
-        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.arc(px, py, 5.5, 0, Math.PI * 2);
+        ctx.fillStyle = pointColor;
         ctx.fill();
-        ctx.strokeStyle = "rgba(255,255,255,0.75)";
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
         ctx.lineWidth = 1.5;
         ctx.stroke();
+
+        ctx.shadowBlur = 0;
       }
     },
     []
@@ -374,6 +381,7 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
             borderRadius: 10,
             display: "block",
             boxShadow: `0 2px 12px ${T.shadow}`,
+            background: isDark ? "#0f172a" : "#f1f5f9",
           }}
         />
         <div>

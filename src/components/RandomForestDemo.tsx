@@ -16,17 +16,18 @@ const CANVAS_H = 420;
 const toPx = (v: number, s: number) => ((v + RANGE) / (2 * RANGE)) * s;
 const fromPx = (p: number, s: number) => (p / s) * (2 * RANGE) - RANGE;
 
-const COLOR_A = [66, 153, 225] as const;
-const COLOR_B = [252, 129, 129] as const;
+const COLOR_A = [6, 182, 212] as const;    // cyan-500
+const COLOR_B = [244, 63, 94] as const;    // rose-500
+const MID     = [100, 116, 139] as const;  // slate-500 midpoint
 
 function blend(prob: number) {
   const t = Math.max(0, Math.min(1, prob));
   if (t >= 0.5) {
     const s = (t - 0.5) * 2;
-    return [Math.round(COLOR_A[0] * s + 255 * (1 - s)), Math.round(COLOR_A[1] * s + 255 * (1 - s)), Math.round(COLOR_A[2] * s + 255 * (1 - s))];
+    return [Math.round(COLOR_A[0] * s + MID[0] * (1 - s)), Math.round(COLOR_A[1] * s + MID[1] * (1 - s)), Math.round(COLOR_A[2] * s + MID[2] * (1 - s))];
   }
   const s = (0.5 - t) * 2;
-  return [Math.round(COLOR_B[0] * s + 255 * (1 - s)), Math.round(COLOR_B[1] * s + 255 * (1 - s)), Math.round(COLOR_B[2] * s + 255 * (1 - s))];
+  return [Math.round(COLOR_B[0] * s + MID[0] * (1 - s)), Math.round(COLOR_B[1] * s + MID[1] * (1 - s)), Math.round(COLOR_B[2] * s + MID[2] * (1 - s))];
 }
 
 function splitDataset(pts: DataPoint[]) {
@@ -105,19 +106,11 @@ const RandomForestDemo: React.FC<Props> = ({ theme }) => {
     const pts = ptsRef.current;
     const W = CANVAS_W, H = CANVAS_H;
     ctx.clearRect(0, 0, W, H);
+    // Canvas background
+    ctx.fillStyle = isDark ? "#0f172a" : "#f1f5f9";
+    ctx.fillRect(0, 0, W, H);
 
-    // Subtle grid
-    ctx.strokeStyle = isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)";
-    ctx.lineWidth = 1;
-    const gridStep = W / 8;
-    for (let gx = gridStep; gx < W; gx += gridStep) {
-      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
-    }
-    for (let gy = gridStep; gy < H; gy += gridStep) {
-      ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
-    }
-
-    // Heatmap
+    // Heatmap (before grid so grid is visible on top)
     const step = 4;
     const img = ctx.createImageData(W, H);
     const d = img.data;
@@ -129,7 +122,7 @@ const RandomForestDemo: React.FC<Props> = ({ theme }) => {
           for (let dx = 0; dx < step && px + dx < W; dx++) {
             for (let dy = 0; dy < step && py + dy < H; dy++) {
               const i = ((py + dy) * W + (px + dx)) * 4;
-              d[i] = r; d[i+1] = g; d[i+2] = b; d[i+3] = 100;
+              d[i] = r; d[i+1] = g; d[i+2] = b; d[i+3] = 130;
             }
           }
         }
@@ -137,25 +130,43 @@ const RandomForestDemo: React.FC<Props> = ({ theme }) => {
     }
     ctx.putImageData(img, 0, 0);
 
-    // Points
+    // Subtle grid (after heatmap so it's visible)
+    ctx.strokeStyle = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
+    ctx.lineWidth = 1;
+    const gridStep = W / 8;
+    for (let gx = gridStep; gx < W; gx += gridStep) {
+      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke();
+    }
+    for (let gy = gridStep; gy < H; gy += gridStep) {
+      ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+    }
+
+    // Points with glow
     for (const pt of pts) {
       const px = toPx(pt.x, W), py = toPx(pt.y, H);
       const [r, g, b] = pt.label === 1 ? COLOR_A : COLOR_B;
+      const pointColor = `rgb(${r},${g},${b})`;
+
+      ctx.shadowBlur = 14;
+      ctx.shadowColor = pointColor;
+
       if (pt.isTest) {
-        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillStyle = pointColor;
         ctx.strokeStyle = "rgba(255,255,255,0.9)";
         ctx.lineWidth = 1.5;
-        ctx.fillRect(px - 5, py - 5, 10, 10);
-        ctx.strokeRect(px - 5, py - 5, 10, 10);
+        ctx.fillRect(px - 5.5, py - 5.5, 11, 11);
+        ctx.strokeRect(px - 5.5, py - 5.5, 11, 11);
       } else {
         ctx.beginPath();
-        ctx.arc(px, py, 5, 0, Math.PI * 2);
-        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.arc(px, py, 5.5, 0, Math.PI * 2);
+        ctx.fillStyle = pointColor;
         ctx.fill();
         ctx.strokeStyle = "rgba(255,255,255,0.9)";
         ctx.lineWidth = 1.5;
         ctx.stroke();
       }
+
+      ctx.shadowBlur = 0;
     }
   }, [isDark]);
 

@@ -25,17 +25,18 @@ const LOSS_H   = 72;
 const toPx   = (v: number, size: number) => ((v + RANGE) / (2 * RANGE)) * size;
 const fromPx = (px: number, size: number) => (px / size) * (2 * RANGE) - RANGE;
 
-const COLOR_A = [66, 153, 225] as const;   // blue  — label 1
-const COLOR_B = [252, 129, 129] as const;  // red   — label 0
+const COLOR_A = [6, 182, 212] as const;    // cyan-500  — label 1
+const COLOR_B = [244, 63, 94] as const;    // rose-500  — label 0
+const MID     = [100, 116, 139] as const;  // slate-500 — uncertain midpoint
 
 function blend(prob: number) {
   const t = Math.max(0, Math.min(1, prob));
   if (t >= 0.5) {
     const s = (t - 0.5) * 2;
-    return [Math.round(COLOR_A[0]*s + 255*(1-s)), Math.round(COLOR_A[1]*s + 255*(1-s)), Math.round(COLOR_A[2]*s + 255*(1-s))];
+    return [Math.round(COLOR_A[0]*s + MID[0]*(1-s)), Math.round(COLOR_A[1]*s + MID[1]*(1-s)), Math.round(COLOR_A[2]*s + MID[2]*(1-s))];
   }
   const s = (0.5 - t) * 2;
-  return [Math.round(COLOR_B[0]*s + 255*(1-s)), Math.round(COLOR_B[1]*s + 255*(1-s)), Math.round(COLOR_B[2]*s + 255*(1-s))];
+  return [Math.round(COLOR_B[0]*s + MID[0]*(1-s)), Math.round(COLOR_B[1]*s + MID[1]*(1-s)), Math.round(COLOR_B[2]*s + MID[2]*(1-s))];
 }
 
 function splitDataset(pts: DataPoint[], testFrac = 0.2): DataPoint[] {
@@ -168,15 +169,11 @@ const SvmDemo: React.FC<SvmDemoProps> = ({ speedScale = 1, theme }) => {
     const pts  = ptsRef.current;
     const W = CANVAS_W, H = CANVAS_H;
     ctx.clearRect(0, 0, W, H);
+    // Canvas background
+    ctx.fillStyle = isDark ? "#0f172a" : "#f1f5f9";
+    ctx.fillRect(0, 0, W, H);
 
-    // Subtle grid
-    ctx.strokeStyle = isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)";
-    ctx.lineWidth = 1;
-    const gs = W / 8;
-    for (let gx = gs; gx < W; gx += gs) { ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
-    for (let gy = gs; gy < H; gy += gs) { ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
-
-    // Heatmap
+    // Heatmap (drawn before grid so grid renders on top)
     const step    = 4;
     const img     = ctx.createImageData(W, H);
     const d       = img.data;
@@ -189,13 +186,20 @@ const SvmDemo: React.FC<SvmDemoProps> = ({ speedScale = 1, theme }) => {
           for (let dx = 0; dx < step && px+dx < W; dx++) {
             for (let dy = 0; dy < step && py+dy < H; dy++) {
               const i = ((py+dy)*W + (px+dx)) * 4;
-              d[i]=r; d[i+1]=g; d[i+2]=b; d[i+3]=100;
+              d[i]=r; d[i+1]=g; d[i+2]=b; d[i+3]=130;
             }
           }
         }
       }
     }
     ctx.putImageData(img, 0, 0);
+
+    // Subtle grid (drawn after heatmap so it's visible on top)
+    ctx.strokeStyle = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)";
+    ctx.lineWidth = 1;
+    const gs = W / 8;
+    for (let gx = gs; gx < W; gx += gs) { ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
+    for (let gy = gs; gy < H; gy += gs) { ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke(); }
 
     // Margin lines + decision boundary (linear only)
     if (trained && svm.kernel === "linear") {
@@ -223,20 +227,29 @@ const SvmDemo: React.FC<SvmDemoProps> = ({ speedScale = 1, theme }) => {
       const px = toPx(pt.x, W), py = toPx(pt.y, H);
       const [r, g, b] = pt.label === 1 ? COLOR_A : COLOR_B;
 
+      const pointColor = `rgb(${r},${g},${b})`;
+
       // Support vector ring (linear only)
       if (trained && svm.kernel === "linear" && svm.isSupportVector(X[i], y[i])) {
-        ctx.beginPath(); ctx.arc(px, py, 9, 0, Math.PI*2);
-        ctx.strokeStyle = isDark ? "rgba(255,255,255,0.5)" : "rgba(50,50,50,0.4)";
-        ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.beginPath(); ctx.arc(px, py, 11, 0, Math.PI*2);
+        ctx.strokeStyle = isDark ? "rgba(255,255,255,0.55)" : "rgba(30,30,30,0.4)";
+        ctx.lineWidth = 2; ctx.stroke();
       }
+
+      // Glow halo
+      ctx.shadowBlur = 14;
+      ctx.shadowColor = pointColor;
+
       if (pt.isTest) {
-        ctx.fillStyle = `rgb(${r},${g},${b})`; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 1.5;
-        ctx.fillRect(px-5, py-5, 10, 10); ctx.strokeRect(px-5, py-5, 10, 10);
+        ctx.fillStyle = pointColor; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 1.5;
+        ctx.fillRect(px-5.5, py-5.5, 11, 11); ctx.strokeRect(px-5.5, py-5.5, 11, 11);
       } else {
-        ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI*2);
-        ctx.fillStyle = `rgb(${r},${g},${b})`; ctx.fill();
+        ctx.beginPath(); ctx.arc(px, py, 5.5, 0, Math.PI*2);
+        ctx.fillStyle = pointColor; ctx.fill();
         ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 1.5; ctx.stroke();
       }
+
+      ctx.shadowBlur = 0;
     }
   }, [isDark]);
 

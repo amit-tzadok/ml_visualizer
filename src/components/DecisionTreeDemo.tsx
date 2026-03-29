@@ -47,24 +47,25 @@ const RANGE = 1.3;
 const toPx = (v: number, size: number) => ((v + RANGE) / (2 * RANGE)) * size;
 const fromPx = (px: number, size: number) => (px / size) * (2 * RANGE) - RANGE;
 
-// Depth-indexed split colours
+// Depth-indexed split colours — vivid palette
 const SPLIT_COLORS = [
-  "#4a5568",
-  "#2b6cb0",
-  "#276749",
-  "#744210",
-  "#553c9a",
-  "#97266d",
+  "#94a3b8",  // slate-400    depth 0
+  "#0ea5e9",  // sky-500      depth 1
+  "#10b981",  // emerald-500  depth 2
+  "#f59e0b",  // amber-500    depth 3
+  "#8b5cf6",  // violet-500   depth 4
+  "#ec4899",  // pink-500     depth 5
 ];
 
+// CLASS_COLORS used for legend / hover (not heatmap pixels directly)
 const CLASS_COLORS: Record<number, string> = {
-  0: "rgba(252,129,129,0.35)",
-  1: "rgba(66,153,225,0.35)",
+  0: "rgba(244,63,94,0.40)",   // rose-500
+  1: "rgba(6,182,212,0.40)",   // cyan-500
 };
 
 const PT_COLORS: Record<number, string> = {
-  0: "rgb(229,62,62)",
-  1: "rgb(49,130,206)",
+  0: "#f43f5e",   // rose-500
+  1: "#06b6d4",   // cyan-500
 };
 
 const CANVAS_W = 480;
@@ -132,14 +133,14 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
           const x = fromPx(px, W);
           const y = fromPx(py, H);
           const pred = tree.predictSample([x, y]);
-          const color = pred === 1 ? [66, 153, 225] : [252, 129, 129];
+          const color = pred === 1 ? [6, 182, 212] : [244, 63, 94];  // cyan-500 vs rose-500
           for (let dx = 0; dx < step && px + dx < W; dx++) {
             for (let dy = 0; dy < step && py + dy < H; dy++) {
               const idx = ((py + dy) * W + (px + dx)) * 4;
               data[idx]     = color[0];
               data[idx + 1] = color[1];
               data[idx + 2] = color[2];
-              data[idx + 3] = 50;
+              data[idx + 3] = 85;
             }
           }
         }
@@ -183,13 +184,21 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
     for (const pt of pts) {
       const px = toPx(pt.x, CANVAS_W);
       const py = toPx(pt.y, CANVAS_H);
+      const color = PT_COLORS[pt.label] ?? "#999";
+
+      // Glow halo
+      ctx.shadowBlur = 14;
+      ctx.shadowColor = color;
+
       ctx.beginPath();
-      ctx.arc(px, py, 4.5, 0, Math.PI * 2);
-      ctx.fillStyle = PT_COLORS[pt.label] ?? "#999";
+      ctx.arc(px, py, 5.5, 0, Math.PI * 2);
+      ctx.fillStyle = color;
       ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.7)";
-      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = "rgba(255,255,255,0.9)";
+      ctx.lineWidth = 1.5;
       ctx.stroke();
+
+      ctx.shadowBlur = 0;
     }
   }, []);
 
@@ -335,6 +344,7 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
             display: "block",
             boxShadow: `0 2px 12px ${T.shadow}`,
             cursor: "crosshair",
+            background: isDark ? "#0f172a" : "#f1f5f9",
           }}
           onClick={(e) => {
             const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
