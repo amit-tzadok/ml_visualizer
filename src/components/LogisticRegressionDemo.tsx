@@ -84,7 +84,7 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
     labelText:   isDark ? "#cbd5e0" : "#4a5568",
     titleText:   theme?.text      ?? "#1a202c",
     controlBg:   theme?.controlBg ?? "rgba(255,255,255,0.98)",
-    accent:      theme?.accent    ?? "#667eea",
+    accent:      theme?.accent    ?? "#0ea5e9",
     shadow:      theme?.shadow    ?? "rgba(0,0,0,0.08)",
     border:      `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "#e2e8f0"}`,
     statsBg:     isDark ? "rgba(45,55,72,0.6)"    : "#f7fafc",
