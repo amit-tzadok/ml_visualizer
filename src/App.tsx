@@ -63,8 +63,8 @@ const App: React.FC = () => {
   const [showKeyboardModal, setShowKeyboardModal] = useState<boolean>(false);
   const themes = {
     light: {
-      background: "linear-gradient(135deg, #fff0f6 0%, #f3e8ff 100%)",
-      mainBackground: "linear-gradient(135deg, #fff0f6 0%, #f3e8ff 100%)",
+      background: "linear-gradient(135deg, #ffc2d1 0%, #c9b8f5 100%)",
+      mainBackground: "linear-gradient(135deg, #ffc2d1 0%, #c9b8f5 100%)",
       text: "#2d3748",
       headerBg: "rgba(255,255,255,0.92)",
       controlBg: "rgba(255,255,255,0.98)",
