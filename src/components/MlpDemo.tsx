@@ -219,40 +219,41 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
           if (root) {
             const canvas = root.querySelector("canvas");
             if (canvas) {
-              const pointerHandler = (ev: PointerEvent) => {
+              const addPoint = (clientX: number, clientY: number, label: string) => {
                 const rect = canvas.getBoundingClientRect();
-                const px = ev.clientX - rect.left;
-                const py = ev.clientY - rect.top;
+                const px = clientX - rect.left;
+                const py = clientY - rect.top;
                 if (px < 0 || py < 0 || px > p.width || py > p.height) return;
                 const mx = p.map(px, 0, p.width, -1, 1);
                 const my = p.map(py, 0, p.height, 1, -1);
-                // choose label: on touch use selected touchClass; otherwise mouse button
-                let label = "A";
-                try {
-                  if (
-                    (ev as PointerEvent & { pointerType?: string })
-                      .pointerType === "touch"
-                  ) {
-                    label = p._mlpControls?.touchClass ?? "A";
-                  } else {
-                    label = ev.button === 2 ? "B" : "A";
-                  }
-                } catch (err) {
-                  // Surface touch detection problems during development but keep production quiet
-                  if (isDev()) console.debug("mlp: touch detection error", err);
-                  label = ev.button === 2 ? "B" : "A";
-                }
                 points.push({ x: mx, y: my, label });
                 X.push([mx, my]);
                 y.push(label === "A" ? 1 : 0);
                 gridDirty = true;
                 if (onDatasetChange)
-                  onDatasetChange((d: Point[] = []) => [
-                    ...d,
-                    { x: mx, y: my, label },
-                  ]);
+                  onDatasetChange((d: Point[] = []) => [...d, { x: mx, y: my, label }]);
               };
-              const ctxHandler = (e: Event) => e.preventDefault();
+
+              // Left-click or touch → pointerdown (button=0 for mouse, any for touch)
+              const pointerHandler = (ev: PointerEvent) => {
+                if (ev.pointerType === "touch") {
+                  // Touch: use the "Touch Adds" dropdown class
+                  const label = p._mlpControls?.touchClass ?? "A";
+                  addPoint(ev.clientX, ev.clientY, label);
+                } else if (ev.button === 0) {
+                  // Left-click only → rose (class A)
+                  addPoint(ev.clientX, ev.clientY, "A");
+                }
+                // button=2 (right-click) is handled by contextmenu below
+              };
+
+              // Right-click → contextmenu fires reliably on all browsers/OS
+              const ctxHandler = (e: Event) => {
+                e.preventDefault();
+                const me = e as MouseEvent;
+                addPoint(me.clientX, me.clientY, "B");
+              };
+
               canvas.addEventListener("pointerdown", pointerHandler);
               canvas.addEventListener("contextmenu", ctxHandler);
               const canvasExt = canvas as unknown as {
