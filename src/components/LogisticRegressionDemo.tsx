@@ -10,11 +10,12 @@ import {
   makeMoons,
   makeCircles,
   makeXOR,
+  makeSpirals,
   toXy,
   DataPoint,
 } from "../utils/datasets";
 
-type DatasetType = "blobs" | "moons" | "circles" | "xor";
+type DatasetType = "blobs" | "moons" | "circles" | "xor" | "spirals";
 
 interface ThemeColors {
   background: string;
@@ -107,6 +108,7 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
       case "moons":   return makeMoons(160, 0.1);
       case "circles": return makeCircles(160, 0.05, 0.38);
       case "xor":     return makeXOR(200, 0.08);
+      case "spirals": return makeSpirals(200, 0.04);
       default:        return makeBlobs(160, 0.13);
     }
   }, []);
@@ -444,7 +446,7 @@ const LogisticRegressionDemo: React.FC<LogisticRegressionDemoProps> = ({
             Dataset
           </span>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {(["blobs", "moons", "circles", "xor"] as DatasetType[]).map(
+            {(["blobs", "moons", "circles", "xor", "spirals"] as DatasetType[]).map(
               (t) => (
                 <button
                   key={t}

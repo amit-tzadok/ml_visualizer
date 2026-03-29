@@ -334,12 +334,33 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
             borderRadius: 10,
             display: "block",
             boxShadow: `0 2px 12px ${T.shadow}`,
+            cursor: "crosshair",
+          }}
+          onClick={(e) => {
+            const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
+            const px = (e.clientX - rect.left) * (CANVAS_W / rect.width);
+            const py = (e.clientY - rect.top)  * (CANVAS_H / rect.height);
+            ptsRef.current = [...ptsRef.current, { x: fromPx(px, CANVAS_W), y: fromPx(py, CANVAS_H), label: 1 }];
+            buildAndAnimate(maxDepth, ptsRef.current);
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
+            const px = (e.clientX - rect.left) * (CANVAS_W / rect.width);
+            const py = (e.clientY - rect.top)  * (CANVAS_H / rect.height);
+            ptsRef.current = [...ptsRef.current, { x: fromPx(px, CANVAS_W), y: fromPx(py, CANVAS_H), label: 0 }];
+            buildAndAnimate(maxDepth, ptsRef.current);
           }}
         />
+        {/* Click legend */}
+        <div style={{ marginTop: 6, display: "flex", gap: 14, fontSize: 11, color: T.subText }}>
+          <span style={{ color: "#4299e1" }}>● left-click: add blue</span>
+          <span style={{ color: "#e53e3e" }}>● right-click: add red</span>
+        </div>
         {/* Depth colour legend */}
         <div
           style={{
-            marginTop: 8,
+            marginTop: 6,
             display: "flex",
             gap: 10,
             flexWrap: "wrap",

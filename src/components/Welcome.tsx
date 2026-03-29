@@ -26,6 +26,26 @@ const Welcome: React.FC<WelcomeProps> = ({ onChoose }) => {
       title: "👥 K-Nearest Neighbors",
       desc: "Classify by nearest points; adjustable k",
     },
+    {
+      key: "logreg",
+      title: "📈 Logistic Regression",
+      desc: "Probabilistic linear classifier with sigmoid",
+    },
+    {
+      key: "dtree",
+      title: "🌿 Decision Tree",
+      desc: "Axis-aligned splits; visualise the tree",
+    },
+    {
+      key: "rforest",
+      title: "🌲 Random Forest",
+      desc: "Ensemble of trees; majority-vote boundary",
+    },
+    {
+      key: "svm",
+      title: "⚡ Support Vector Machine",
+      desc: "Max-margin boundary; see support vectors",
+    },
   ];
   return (
     <div
@@ -131,6 +151,30 @@ const Welcome: React.FC<WelcomeProps> = ({ onChoose }) => {
                 tint2: "rgba(6,182,212,0.12)",
                 glow: "rgba(6,182,212,0.45)",
                 border: "rgba(6,182,212,0.45)",
+              },
+              logreg: {
+                tint1: "rgba(245,158,11,0.22)",
+                tint2: "rgba(245,158,11,0.12)",
+                glow: "rgba(245,158,11,0.45)",
+                border: "rgba(245,158,11,0.45)",
+              },
+              dtree: {
+                tint1: "rgba(34,197,94,0.22)",
+                tint2: "rgba(34,197,94,0.12)",
+                glow: "rgba(34,197,94,0.45)",
+                border: "rgba(34,197,94,0.45)",
+              },
+              rforest: {
+                tint1: "rgba(16,185,129,0.22)",
+                tint2: "rgba(16,185,129,0.12)",
+                glow: "rgba(16,185,129,0.45)",
+                border: "rgba(16,185,129,0.45)",
+              },
+              svm: {
+                tint1: "rgba(239,68,68,0.22)",
+                tint2: "rgba(239,68,68,0.12)",
+                glow: "rgba(239,68,68,0.45)",
+                border: "rgba(239,68,68,0.45)",
               },
             };
             const c: Tint = tints[card.key] || tints.linear;

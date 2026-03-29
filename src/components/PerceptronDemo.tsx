@@ -1372,17 +1372,7 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
           return;
         }
         if (p.key === "b") {
-          points.push({ x: mouseXNorm, y: mouseYNorm, labelSigned: 1 });
-          X.push([mouseXNorm, mouseYNorm]);
-          y.push(1);
-          safeTrainSample([mouseXNorm, mouseYNorm], 1);
-          if (onDatasetChange)
-            onDatasetChange((d: any) => [
-              ...d,
-              { x: mouseXNorm, y: mouseYNorm, label: "A" },
-            ]);
-        }
-        if (p.key === "r") {
+          // b = blue = class B (labelSigned -1)
           points.push({ x: mouseXNorm, y: mouseYNorm, labelSigned: -1 });
           X.push([mouseXNorm, mouseYNorm]);
           y.push(0);
@@ -1391,6 +1381,18 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
             onDatasetChange((d: any) => [
               ...d,
               { x: mouseXNorm, y: mouseYNorm, label: "B" },
+            ]);
+        }
+        if (p.key === "r") {
+          // r = red = class A (labelSigned +1)
+          points.push({ x: mouseXNorm, y: mouseYNorm, labelSigned: 1 });
+          X.push([mouseXNorm, mouseYNorm]);
+          y.push(1);
+          safeTrainSample([mouseXNorm, mouseYNorm], 1);
+          if (onDatasetChange)
+            onDatasetChange((d: any) => [
+              ...d,
+              { x: mouseXNorm, y: mouseYNorm, label: "A" },
             ]);
         }
         if (p.key === "+" || p.key === "=") speed = Math.min(20, speed + 1);

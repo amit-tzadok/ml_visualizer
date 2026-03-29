@@ -30,8 +30,8 @@ const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
         { key: "+/-", description: "Adjust k (neighbors)" },
       ]
     : [
-        { key: "B", description: "Add blue point (Class A)" },
-        { key: "R", description: "Add red point (Class B)" },
+        { key: "B", description: "Add blue point (Class B)" },
+        { key: "R", description: "Add red point (Class A)" },
         { key: "Space", description: "Pause/Resume training" },
         { key: "+/-", description: "Increase/Decrease speed" },
       ];

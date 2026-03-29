@@ -11,6 +11,7 @@ export interface TreeNode {
   right?: TreeNode;
   // Leaf / metadata
   prediction?: number;
+  prob1?: number;    // fraction of class-1 samples at this leaf (for soft heatmap)
   gini?: number;
   samples?: number;
   depth?: number;
@@ -114,6 +115,8 @@ export class DecisionTree {
 
   private buildNode(X: number[][], y: number[], depth: number): TreeNode {
     const node: TreeNode = { gini: this.gini(y), samples: y.length, depth };
+    // Store class-1 fraction for soft probability heatmap
+    node.prob1 = y.length ? y.filter(v => v === 1).length / y.length : 0.5;
 
     // Leaf conditions
     if (
@@ -166,6 +169,17 @@ export class DecisionTree {
       node = x[node.feature] <= node.threshold ? node.left : node.right;
     }
     return 0;
+  }
+
+  /** Soft probability of class 1 (fraction of class-1 samples at the leaf). */
+  predictProbaSample(x: number[]): number {
+    let node: TreeNode | null | undefined = this.root;
+    while (node) {
+      if (node.prediction !== undefined) return node.prob1 ?? (node.prediction === 1 ? 1 : 0);
+      if (node.feature === undefined || node.threshold === undefined) return 0.5;
+      node = x[node.feature] <= node.threshold ? node.left : node.right;
+    }
+    return 0.5;
   }
 
   predict(X: number[][]): number[] {

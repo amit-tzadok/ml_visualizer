@@ -6,12 +6,15 @@ const KnnDemo = React.lazy(() => import("./components/KnnDemo"));
 const MlpDemo = React.lazy(() => import("./components/MlpDemo"));
 const LogisticRegressionDemo = React.lazy(() => import("./components/LogisticRegressionDemo"));
 const DecisionTreeDemo = React.lazy(() => import("./components/DecisionTreeDemo"));
+const RandomForestDemo = React.lazy(() => import("./components/RandomForestDemo"));
+const SvmDemo = React.lazy(() => import("./components/SvmDemo"));
 const Welcome = React.lazy(() => import("./components/Welcome"));
 const AgentPanel = React.lazy(() => import("./components/AgentPanel"));
 const InfoModal = React.lazy(() => import("./components/InfoModal"));
 const KeyboardShortcutsModal = React.lazy(
   () => import("./components/KeyboardShortcutsModal")
 );
+import ErrorBoundary from "./components/ErrorBoundary";
 
 // JS components are lazy-loaded; use a permissive generic component type to avoid `any`
 const CompareAny = CompareDemo as React.LazyExoticComponent<
@@ -513,6 +516,7 @@ const App: React.FC = () => {
             transition: "padding 0.3s ease",
           }}
         >
+          <ErrorBoundary theme={currentTheme}>
           <Suspense
             fallback={
               <div style={{ color: currentTheme.text, opacity: 0.7 }}>
@@ -575,7 +579,7 @@ const App: React.FC = () => {
                   maxWidth: 1400,
                   maxHeight: 1200,
                   display: "flex",
-                  alignItems: "center",
+                  alignItems: "flex-start",
                   justifyContent: "center",
                   overflowY: "auto",
                 }}
@@ -590,12 +594,42 @@ const App: React.FC = () => {
                   maxWidth: 1400,
                   maxHeight: 1200,
                   display: "flex",
-                  alignItems: "center",
+                  alignItems: "flex-start",
                   justifyContent: "center",
                   overflowY: "auto",
                 }}
               >
                 <DecisionTreeDemo key={runKey} speedScale={speedScale} theme={currentTheme} />
+              </div>
+            ) : classifier === "rforest" ? (
+              <div
+                style={{
+                  width: "96%",
+                  height: "96%",
+                  maxWidth: 1400,
+                  maxHeight: 1200,
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "center",
+                  overflowY: "auto",
+                }}
+              >
+                <RandomForestDemo key={runKey} speedScale={speedScale} theme={currentTheme} />
+              </div>
+            ) : classifier === "svm" ? (
+              <div
+                style={{
+                  width: "96%",
+                  height: "96%",
+                  maxWidth: 1400,
+                  maxHeight: 1200,
+                  display: "flex",
+                  alignItems: "flex-start",
+                  justifyContent: "center",
+                  overflowY: "auto",
+                }}
+              >
+                <SvmDemo key={runKey} speedScale={speedScale} theme={currentTheme} />
               </div>
             ) : (
               <div
@@ -621,6 +655,7 @@ const App: React.FC = () => {
               </div>
             )}
           </Suspense>
+          </ErrorBoundary>
         </div>
       </main>
 
@@ -670,7 +705,7 @@ const App: React.FC = () => {
               onChange={(e) => {
                 const v = e.target.value;
                 // Exit compare mode for classifiers that don't support it
-                if ((v === "knn" || v === "logreg" || v === "dtree") && compare) {
+                if ((v === "knn" || v === "logreg" || v === "dtree" || v === "rforest" || v === "svm") && compare) {
                   setCompare(false);
                   setClassifier(v);
                   _setRunKey((k) => k + 1);
@@ -708,6 +743,8 @@ const App: React.FC = () => {
               <option value="knn">K-Nearest Neighbors</option>
               <option value="logreg">Logistic Regression</option>
               <option value="dtree">Decision Tree</option>
+              <option value="rforest">Random Forest</option>
+              <option value="svm">Support Vector Machine</option>
             </select>
           </label>
 

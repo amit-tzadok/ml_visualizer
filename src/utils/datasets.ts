@@ -7,6 +7,7 @@ export interface DataPoint {
   x: number;
   y: number;
   label: 0 | 1;
+  isTest?: boolean;   // true = held-out test point (shown as square)
 }
 
 /** Box-Muller Gaussian noise */
