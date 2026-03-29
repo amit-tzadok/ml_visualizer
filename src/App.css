@@ -35,9 +35,9 @@ body {
   opacity: 0.35;
   animation: orbFloat 18s ease-in-out infinite;
 }
-.mlv-orb.orb1 { background: #8ec5ff; top: -10vmax; left: -10vmax; animation-delay: 0s; }
-.mlv-orb.orb2 { background: #f3a4ff; bottom: -12vmax; right: -8vmax; animation-delay: 3s; }
-.mlv-orb.orb3 { background: #ffd3a4; top: 20%; right: 10%; animation-delay: 6s; }
+.mlv-orb.orb1 { background: #7dd3fc; top: -10vmax; left: -10vmax; animation-delay: 0s; }
+.mlv-orb.orb2 { background: #67e8f9; bottom: -12vmax; right: -8vmax; animation-delay: 3s; }
+.mlv-orb.orb3 { background: #a5f3fc; top: 20%; right: 10%; animation-delay: 6s; }
 
 @keyframes orbFloat {
   0%, 100% { transform: translate(0, 0) scale(1); }

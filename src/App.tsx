@@ -64,7 +64,7 @@ const App: React.FC = () => {
   const themes = {
     light: {
       background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
-      mainBackground: "linear-gradient(135deg, #ecececff 0%, #d76bdbff 100%)",
+      mainBackground: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)",
       text: "#2d3748",
       headerBg: "rgba(255,255,255,0.95)",
       controlBg: "rgba(255,255,255,0.98)",
