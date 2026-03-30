@@ -1380,9 +1380,8 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
         const mouseXNorm = p.map(p.mouseX, 0, p.width, -1, 1);
         const mouseYNorm = p.map(p.mouseY, p.height, 0, -1, 1);
         if (p.key === " ") {
-          // Only toggle pause/resume; do not mark as finished or show overlays on manual pause
           paused = !paused;
-          return;
+          return false; // prevent page scroll
         }
         if (p.key === "b") {
           // b = blue = class B (labelSigned -1)
@@ -1395,6 +1394,7 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
               ...d,
               { x: mouseXNorm, y: mouseYNorm, label: "B" },
             ]);
+          return false; // prevent <select> from navigating
         }
         if (p.key === "r") {
           // r = red = class A (labelSigned +1)
@@ -1407,6 +1407,7 @@ const PerceptronDemo: React.FC<PerceptronDemoProps> = ({
               ...d,
               { x: mouseXNorm, y: mouseYNorm, label: "A" },
             ]);
+          return false; // prevent <select> from navigating to Random Forest
         }
         if (p.key === "+" || p.key === "=") speed = Math.min(20, speed + 1);
         if (p.key === "-" || p.key === "_") speed = Math.max(0, speed - 1);

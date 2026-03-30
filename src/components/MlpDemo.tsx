@@ -681,9 +681,11 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
       p.mousePressed = () => {};
 
       // Keyboard shortcuts: b = blue (class B), r = red (class A)
+      // Returns false so p5 calls e.preventDefault() — prevents the algorithm
+      // <select> dropdown from jumping to "Random Forest" when 'r' is pressed.
       p.keyPressed = () => {
-        if (p.key !== "b" && p.key !== "r") return;
-        if (p.mouseX < 0 || p.mouseY < 0 || p.mouseX > p.width || p.mouseY > p.height) return;
+        if (p.key !== "b" && p.key !== "r") return; // other keys: allow default
+        if (p.mouseX < 0 || p.mouseY < 0 || p.mouseX > p.width || p.mouseY > p.height) return false;
         const mx = p.map(p.mouseX, 0, p.width, -1, 1);
         const my = p.map(p.mouseY, p.height, 0, -1, 1);
         const label = p.key === "b" ? "B" : "A"; // b=blue(B), r=red(A)
@@ -693,6 +695,7 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
         gridDirty = true;
         if (onDatasetChange)
           onDatasetChange((d: Point[] = []) => [...d, { x: mx, y: my, label }]);
+        return false; // prevent <select> from receiving this keystroke
       };
 
       p.updateDataset = (newDataset: Point[] | undefined) => {
