@@ -234,17 +234,13 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
                   onDatasetChange((d: Point[] = []) => [...d, { x: mx, y: my, label }]);
               };
 
-              // Left-click or touch → pointerdown (button=0 for mouse, any for touch)
+              // Left-click → add rose/class A
+              // Touch events (two-finger trackpad etc.) are intentionally ignored here;
+              // use keyboard b/r shortcuts or right-click for cyan/class B.
               const pointerHandler = (ev: PointerEvent) => {
-                if (ev.pointerType === "touch") {
-                  // Touch: use the "Touch Adds" dropdown class
-                  const label = p._mlpControls?.touchClass ?? "A";
-                  addPoint(ev.clientX, ev.clientY, label);
-                } else if (ev.button === 0) {
-                  // Left-click only → rose (class A)
-                  addPoint(ev.clientX, ev.clientY, "A");
-                }
-                // button=2 (right-click) is handled by contextmenu below
+                if (ev.pointerType === "touch") return; // ignore trackpad/touch — use keys
+                if (ev.button !== 0) return;            // left-click only
+                addPoint(ev.clientX, ev.clientY, "A");
               };
 
               // Right-click → contextmenu fires reliably on all browsers/OS
@@ -680,10 +676,24 @@ const MlpDemo: React.FC<MlpDemoProps> = ({
         }
       };
 
-      // Point-adding is handled by the DOM pointerdown listener attached in setup
-      // (uses ev.button and ev.pointerType reliably). The p.mousePressed hook is a
-      // no-op to avoid double-adding points on every click.
+      // Point-adding is handled by the DOM pointerdown/contextmenu listeners in setup.
+      // p.mousePressed is a no-op to prevent double-adding.
       p.mousePressed = () => {};
+
+      // Keyboard shortcuts: b = blue (class B), r = red (class A)
+      p.keyPressed = () => {
+        if (p.key !== "b" && p.key !== "r") return;
+        if (p.mouseX < 0 || p.mouseY < 0 || p.mouseX > p.width || p.mouseY > p.height) return;
+        const mx = p.map(p.mouseX, 0, p.width, -1, 1);
+        const my = p.map(p.mouseY, p.height, 0, -1, 1);
+        const label = p.key === "b" ? "B" : "A"; // b=blue(B), r=red(A)
+        points.push({ x: mx, y: my, label });
+        X.push([mx, my]);
+        y.push(label === "A" ? 1 : 0);
+        gridDirty = true;
+        if (onDatasetChange)
+          onDatasetChange((d: Point[] = []) => [...d, { x: mx, y: my, label }]);
+      };
 
       p.updateDataset = (newDataset: Point[] | undefined) => {
         points = [];
