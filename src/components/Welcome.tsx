@@ -50,47 +50,64 @@ const Welcome: React.FC<WelcomeProps> = ({ onChoose }) => {
   return (
     <div
       style={{
-        height: "100%",
+        minHeight: "100vh",
         width: "100%",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         color: "#fff",
         fontFamily: "system-ui, sans-serif",
-        padding: "1rem",
+        padding: "clamp(10px, 2.2vmin, 18px)",
         animation: "fadeIn 0.6s ease-out",
+        boxSizing: "border-box",
       }}
     >
       <div
         style={{
-          maxWidth: "900px",
+          width: "min(900px, 100%)",
+          maxHeight: "calc(100vh - clamp(20px, 4.4vmin, 36px))",
           textAlign: "center",
           background: "rgba(255,255,255,0.08)",
           backdropFilter: "blur(20px)",
           borderRadius: "24px",
-          padding: "2rem",
+          padding: "clamp(14px, 2.6vmin, 22px)",
           boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
           border: "1px solid rgba(255,255,255,0.2)",
           animation: "slideUp 0.8s ease-out 0.2s both",
           position: "relative",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          gap: "clamp(8px, 1.6vmin, 14px)",
+          overflow: "hidden",
+          boxSizing: "border-box",
         }}
       >
         <div
           style={{
-            fontSize: "3rem",
+            fontSize: "clamp(1.8rem, 3.6vmin, 2.6rem)",
             fontWeight: "bold",
-            marginBottom: "1rem",
+            marginBottom: 0,
             color: "#fff",
             textShadow: "0 2px 10px rgba(0,0,0,0.3)",
             animation: "bounceIn 1s ease-out 0.4s both",
           }}
         >
-          <img src="/logo.png" alt="ML Visualizer" style={{ width: "100px", height: "100px" }} />
+          <img
+            src="/logo.png"
+            alt="ML Visualizer"
+            style={{
+              width: "clamp(64px, 9vmin, 96px)",
+              height: "clamp(64px, 9vmin, 96px)",
+              display: "block",
+              margin: "0 auto",
+            }}
+          />
         </div>
         <h1
           style={{
-            fontSize: "2.2rem",
-            margin: "0 0 1rem 0",
+            fontSize: "clamp(1.55rem, 3.1vmin, 2.05rem)",
+            margin: 0,
             fontWeight: "300",
             color: "#fff",
             textShadow: "0 2px 10px rgba(0,0,0,0.3)",
@@ -102,10 +119,10 @@ const Welcome: React.FC<WelcomeProps> = ({ onChoose }) => {
         </h1>
         <p
           style={{
-            fontSize: "1.2rem",
-            marginBottom: "2rem",
+            fontSize: "clamp(0.95rem, 2.1vmin, 1.1rem)",
+            margin: 0,
             opacity: 0.95,
-            lineHeight: 1.6,
+            lineHeight: 1.45,
             maxWidth: "600px",
             marginLeft: "auto",
             marginRight: "auto",
@@ -120,9 +137,9 @@ const Welcome: React.FC<WelcomeProps> = ({ onChoose }) => {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "1rem",
-            marginBottom: "2rem",
+            gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))",
+            gap: "clamp(8px, 1.4vmin, 12px)",
+            marginTop: "clamp(6px, 1.2vmin, 10px)",
           }}
         >
           {cards.map((card, idx) => {
@@ -183,7 +200,7 @@ const Welcome: React.FC<WelcomeProps> = ({ onChoose }) => {
                 key={card.key}
                 onClick={() => onChoose && onChoose(card.key)}
                 style={{
-                  padding: "1.4rem 1.2rem",
+                  padding: "clamp(12px, 2.2vmin, 18px) clamp(12px, 2.0vmin, 16px)",
                   background: `linear-gradient(145deg, ${c.tint1}, ${c.tint2}), linear-gradient(145deg, rgba(255,255,255,0.18), rgba(255,255,255,0.08))`,
                   borderRadius: "16px",
                   backdropFilter: "blur(20px)",
@@ -205,8 +222,12 @@ const Welcome: React.FC<WelcomeProps> = ({ onChoose }) => {
                   (e.currentTarget as HTMLElement).style.boxShadow = "none";
                 }}
               >
-                <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>{card.title}</div>
-                <div style={{ fontSize: "0.9rem", opacity: 0.9 }}>{card.desc}</div>
+                <div style={{ fontSize: "clamp(0.95rem, 2.0vmin, 1.05rem)", fontWeight: 700 }}>
+                  {card.title}
+                </div>
+                <div style={{ fontSize: "clamp(0.78rem, 1.7vmin, 0.9rem)", opacity: 0.9, lineHeight: 1.25 }}>
+                  {card.desc}
+                </div>
                 <div
                   style={{
                     position: "absolute",
@@ -225,7 +246,14 @@ const Welcome: React.FC<WelcomeProps> = ({ onChoose }) => {
           })}
         </div>
 
-        <div style={{ fontSize: "0.85rem", opacity: 0.8, marginTop: "8px", animation: "slideUp 0.8s ease-out 1.8s both" }}>
+        <div
+          style={{
+            fontSize: "clamp(0.78rem, 1.6vmin, 0.85rem)",
+            opacity: 0.8,
+            marginTop: "clamp(2px, 0.8vmin, 8px)",
+            animation: "slideUp 0.8s ease-out 1.8s both",
+          }}
+        >
           Choose a card above to begin
         </div>
       </div>
