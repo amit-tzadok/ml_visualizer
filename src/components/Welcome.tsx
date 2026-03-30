@@ -85,7 +85,7 @@ const Welcome: React.FC<WelcomeProps> = ({ onChoose }) => {
             animation: "bounceIn 1s ease-out 0.4s both",
           }}
         >
-          🧠
+          <img src="/logo.png" alt="ML Visualizer" style={{ width: "100px", height: "100px" }} />
         </div>
         <h1
           style={{
