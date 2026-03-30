@@ -136,10 +136,10 @@ body {
 
 @keyframes buttonPulse {
   0%, 100% {
-    box-shadow: 0 10px 30px rgba(244, 63, 94, 0.4);
+    box-shadow: 0 10px 30px rgba(124, 58, 237, 0.4);
   }
   50% {
-    box-shadow: 0 10px 30px rgba(244, 63, 94, 0.6), 0 0 20px rgba(244, 63, 94, 0.3);
+    box-shadow: 0 10px 30px rgba(124, 58, 237, 0.6), 0 0 20px rgba(124, 58, 237, 0.3);
   }
 }
 
@@ -249,7 +249,7 @@ body {
 
 /* Accessible focus ring — only shown on keyboard navigation, not mouse */
 *:focus-visible {
-  outline: 2px solid #f43f5e;
+  outline: 2px solid #7c3aed;
   outline-offset: 2px;
   border-radius: 4px;
 }

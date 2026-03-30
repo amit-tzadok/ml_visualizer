@@ -80,10 +80,11 @@ const RandomForestDemo: React.FC<Props> = ({ theme }) => {
     dimText: isDark ? "#718096" : "#a0aec0",
   };
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const rfRef     = useRef(new RandomForest({ nEstimators: 0, maxDepth: 5 }));
-  const ptsRef    = useRef<DataPoint[]>([]);
-  const animRef   = useRef<number | null>(null);
+  const canvasRef   = useRef<HTMLCanvasElement>(null);
+  const rfRef       = useRef(new RandomForest({ nEstimators: 0, maxDepth: 5 }));
+  const ptsRef      = useRef<DataPoint[]>([]);
+  const animRef     = useRef<number | null>(null);
+  const mousePosRef = useRef<{ px: number; py: number } | null>(null);
 
   const [dsType, setDsType]       = useState<DatasetType>("moons");
   const [noise, setNoise]         = useState(0.1);
@@ -233,6 +234,26 @@ const RandomForestDemo: React.FC<Props> = ({ theme }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // R / B keyboard shortcuts — add point at current mouse position
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      if (key !== "r" && key !== "b") return;
+      e.preventDefault();
+      const pos = mousePosRef.current;
+      if (!pos) return;
+      ptsRef.current = [...ptsRef.current, {
+        x: fromPx(pos.px, CANVAS_W),
+        y: fromPx(pos.py, CANVAS_H),
+        label: key === "b" ? 1 : 0,
+      }];
+      setDataChanged(true);
+      drawCanvas();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [drawCanvas]);
+
   const fmtPct = (v: number | null | undefined) => v == null ? "—" : (v * 100).toFixed(1) + "%";
 
   const btnStyle = (active = false) => ({
@@ -252,6 +273,13 @@ const RandomForestDemo: React.FC<Props> = ({ theme }) => {
       <div style={{ flex: "0 0 auto" }}>
         <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H}
           style={{ border: T.brd, borderRadius: 10, display: "block", boxShadow: `0 2px 12px ${T.sh}`, cursor: "crosshair" }}
+          onMouseMove={(e) => {
+            const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
+            mousePosRef.current = {
+              px: (e.clientX - rect.left) * (CANVAS_W / rect.width),
+              py: (e.clientY - rect.top)  * (CANVAS_H / rect.height),
+            };
+          }}
           onClick={(e) => {
             const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
             const px = (e.clientX - rect.left) * (CANVAS_W / rect.width);
@@ -279,8 +307,8 @@ const RandomForestDemo: React.FC<Props> = ({ theme }) => {
           </div>
         )}
         <div style={{ marginTop: 6, display: "flex", gap: 14, fontSize: 11, color: T.sub, flexWrap: "wrap" as const }}>
-          <span style={{ color: "#4299e1" }}>● left-click: add blue</span>
-          <span style={{ color: "#fc8181" }}>● right-click: add red</span>
+          <span style={{ color: "#06b6d4" }}>● blue — left-click or B</span>
+          <span style={{ color: "#f43f5e" }}>● red — right-click or R</span>
           <span style={{ marginLeft: "auto" }}>Trees: {treeCount}/{growing ? "…" : nTrees}</span>
         </div>
       </div>

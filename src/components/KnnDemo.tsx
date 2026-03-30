@@ -388,15 +388,18 @@ const KNNDemo: React.FC<KnnProps> = ({
       };
 
       p.keyPressed = () => {
-        if (p.key === "a" || p.key === "A") {
+        if (p.key === "a" || p.key === "A" || p.key === "r" || p.key === "R") {
           mode = "addA";
         } else if (p.key === "b" || p.key === "B") {
           mode = "addB";
         } else if (p.key === "p" || p.key === "P") {
           mode = "predict";
+        } else {
+          return;
         }
         modeRef.current = mode;
         requestRedraw();
+        return false; // prevent <select> from intercepting r/b
       };
 
       p.draw = () => {

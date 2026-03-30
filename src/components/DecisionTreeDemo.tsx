@@ -92,6 +92,7 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
   const boundariesRef = useRef<SplitBoundary[]>([]);
   const visibleBoundariesRef = useRef<number>(0); // how many splits are drawn
   const animatingRef = useRef(false);
+  const mousePosRef = useRef<{ px: number; py: number } | null>(null);
 
   const [datasetType, setDatasetType] = useState<DatasetType>("blobs");
   const [maxDepth, setMaxDepth] = useState(4);
@@ -303,6 +304,25 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
     return () => stopAnimation();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // R / B keyboard shortcuts — add point at current mouse position
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      if (key !== "r" && key !== "b") return;
+      e.preventDefault();
+      const pos = mousePosRef.current;
+      if (!pos) return;
+      ptsRef.current = [...ptsRef.current, {
+        x: fromPx(pos.px, CANVAS_W),
+        y: fromPx(pos.py, CANVAS_H),
+        label: key === "b" ? 1 : 0,
+      }];
+      buildAndAnimate(maxDepth, ptsRef.current);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [buildAndAnimate, maxDepth]);
+
   const handleDatasetChange = (type: DatasetType) => {
     setDatasetType(type);
     reset(type);
@@ -346,6 +366,13 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
             cursor: "crosshair",
             background: isDark ? "#0f172a" : "#f1f5f9",
           }}
+          onMouseMove={(e) => {
+            const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
+            mousePosRef.current = {
+              px: (e.clientX - rect.left) * (CANVAS_W / rect.width),
+              py: (e.clientY - rect.top)  * (CANVAS_H / rect.height),
+            };
+          }}
           onClick={(e) => {
             const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
             const px = (e.clientX - rect.left) * (CANVAS_W / rect.width);
@@ -364,8 +391,8 @@ const DecisionTreeDemo: React.FC<DecisionTreeDemoProps> = ({
         />
         {/* Click legend */}
         <div style={{ marginTop: 6, display: "flex", gap: 14, fontSize: 11, color: T.subText }}>
-          <span style={{ color: "#4299e1" }}>● left-click: add blue</span>
-          <span style={{ color: "#e53e3e" }}>● right-click: add red</span>
+          <span style={{ color: "#06b6d4" }}>● blue — left-click or B</span>
+          <span style={{ color: "#f43f5e" }}>● red — right-click or R</span>
         </div>
         {/* Depth colour legend */}
         <div

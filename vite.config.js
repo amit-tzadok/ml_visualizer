@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => ({
   // Use relative asset paths for production so the site works on GitHub Pages
   // where the app is served from /<repo>/ rather than the domain root.
   // Vercel serves from the domain root (/); GitHub Pages serves from a subdirectory (./)
-  base: process.env.VERCEL ? '/' : (mode === 'production' ? './' : '/'),
+  base: process.env.VERCEL ? '/' : (mode === 'production' ? '/ml_visualizer/' : '/'),
   plugins: [react()],
   build: {
     rollupOptions: {

@@ -101,6 +101,7 @@ const SvmDemo: React.FC<SvmDemoProps> = ({ speedScale = 1, theme }) => {
   const epochRef     = useRef(0);
   const lastFrameRef = useRef(0);
   const lossHistRef  = useRef<number[]>([]);
+  const mousePosRef  = useRef<{ px: number; py: number } | null>(null);
 
   const [dataset,        setDataset]        = useState<DatasetType>("blobs");
   const [noise,          setNoise]          = useState(0.12);
@@ -314,6 +315,25 @@ const SvmDemo: React.FC<SvmDemoProps> = ({ speedScale = 1, theme }) => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // R / B keyboard shortcuts — add point at current mouse position
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      if (key !== "r" && key !== "b") return;
+      e.preventDefault();
+      const pos = mousePosRef.current;
+      if (!pos) return;
+      ptsRef.current = [...ptsRef.current, {
+        x: fromPx(pos.px, CANVAS_W),
+        y: fromPx(pos.py, CANVAS_H),
+        label: key === "b" ? 1 : 0,
+      }];
+      drawCanvas();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [drawCanvas]);
+
   const fmtPct = (v: number | null | undefined) => v == null ? "—" : (v * 100).toFixed(1) + "%";
 
   const btnStyle = (active = false) => ({
@@ -333,6 +353,13 @@ const SvmDemo: React.FC<SvmDemoProps> = ({ speedScale = 1, theme }) => {
       <div style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", gap: 8 }}>
         <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H}
           style={{ border: T.brd, borderRadius: 10, display: "block", boxShadow: `0 2px 12px ${T.sh}`, cursor: "crosshair" }}
+          onMouseMove={(e) => {
+            const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
+            mousePosRef.current = {
+              px: (e.clientX - rect.left) * (CANVAS_W / rect.width),
+              py: (e.clientY - rect.top)  * (CANVAS_H / rect.height),
+            };
+          }}
           onClick={(e) => {
             const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
             const px = (e.clientX - rect.left) * (CANVAS_W / rect.width);
@@ -358,8 +385,8 @@ const SvmDemo: React.FC<SvmDemoProps> = ({ speedScale = 1, theme }) => {
         </div>
         {/* Legend */}
         <div style={{ display: "flex", gap: 14, fontSize: 11, color: T.sub }}>
-          <span style={{ color: "#4299e1" }}>● blue (left-click)</span>
-          <span style={{ color: "#fc8181" }}>● red (right-click)</span>
+          <span style={{ color: "#06b6d4" }}>● blue — left-click or B</span>
+          <span style={{ color: "#f43f5e" }}>● red — right-click or R</span>
           {kernel === "linear" && <span>◎ support vector</span>}
         </div>
       </div>

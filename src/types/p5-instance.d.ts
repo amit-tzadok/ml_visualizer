@@ -42,6 +42,10 @@ export interface P5Instance {
   red?: (c: unknown) => number;
   green?: (c: unknown) => number;
   blue?: (c: unknown) => number;
+  key?: string;
+  keyCode?: number;
+  keyPressed?: () => void | boolean | false;
+  drawingContext: CanvasRenderingContext2D;
 
   // our injected helpers
   updateDataset?: (dataset?: Array<{ x: number; y: number; label?: string }>) => void;

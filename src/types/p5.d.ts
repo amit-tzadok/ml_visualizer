@@ -31,6 +31,7 @@ export interface P5Instance {
   red?: (c: unknown) => number;
   green?: (c: unknown) => number;
   blue?: (c: unknown) => number;
+  drawingContext: CanvasRenderingContext2D;
   clear?: () => void;
   key?: string;
   keyPressed?: () => void;
